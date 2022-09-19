@@ -1,0 +1,27 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NQueue", "NQueue\NQueue.csproj", "{2C8333B0-529A-4F3D-9BF0-7AB8109E025B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionFolder", "SolutionFolder", "{FEA4FDF9-B61F-411A-918B-68E5C023F18E}"
+	ProjectSection(SolutionItems) = preProject
+		Readme.md = Readme.md
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NQueue.Sample", "NQueue.Sample\NQueue.Sample.csproj", "{A8BA502E-8CFB-404B-AE0D-16AB3A0F3D60}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2C8333B0-529A-4F3D-9BF0-7AB8109E025B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C8333B0-529A-4F3D-9BF0-7AB8109E025B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C8333B0-529A-4F3D-9BF0-7AB8109E025B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C8333B0-529A-4F3D-9BF0-7AB8109E025B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8BA502E-8CFB-404B-AE0D-16AB3A0F3D60}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8BA502E-8CFB-404B-AE0D-16AB3A0F3D60}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8BA502E-8CFB-404B-AE0D-16AB3A0F3D60}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8BA502E-8CFB-404B-AE0D-16AB3A0F3D60}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

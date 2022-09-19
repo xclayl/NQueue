@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
+        <PackageVersion>1.0.0-beta-001</PackageVersion>
+        <Authors>Clay Lenhart</Authors>
+        <Description>NQueue runs background code in a dotnet ASPNet Core application in a persistent way by storing the work items in SQL Server.</Description>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageId>NQueue</PackageId>
+        <Copyright>Copyright (c) Clay Lenhart 2022.</Copyright>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Cronos" Version="0.7.1" />
+      <PackageReference Include="Microsoft.Data.SqlClient" Version="3.1.1" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="3.1.24" />
+      <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="3.1.24" />
+      <PackageReference Include="Microsoft.Extensions.Http" Version="3.1.24" />
+      <PackageReference Include="System.Linq.Async" Version="4.1.1" />
+    </ItemGroup>
+
+</Project>
