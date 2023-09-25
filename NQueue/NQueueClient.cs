@@ -7,7 +7,7 @@ namespace NQueue
 {
     public interface INQueueClient
     {
-        Task Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null,
+        ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null,
             bool duplicatePrevention = false);
     }
 
@@ -21,7 +21,7 @@ namespace NQueue
         }
 
 
-        public async Task Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string debugInfo = null,
+        public async ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string debugInfo = null,
             bool duplicatePrevention = false)
         {
             if (tran == null)
@@ -31,7 +31,7 @@ namespace NQueue
         }
         
 
-        private async Task EnqueueWorkItem(Uri url, string? queueName, string? debugInfo,
+        private async ValueTask EnqueueWorkItem(Uri url, string? queueName, string? debugInfo,
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();
@@ -43,7 +43,7 @@ namespace NQueue
         }
 
 
-        private async Task EnqueueWorkItem(DbTransaction tran, Uri url, string? queueName, string? debugInfo,
+        private async ValueTask EnqueueWorkItem(DbTransaction tran, Uri url, string? queueName, string? debugInfo,
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();

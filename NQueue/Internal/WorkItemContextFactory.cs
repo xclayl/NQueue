@@ -21,13 +21,13 @@ namespace NQueue.Internal
             _tz = config.TimeZone;
         }
 
-        internal async Task<WorkItemDbQuery> Get()
+        internal async ValueTask<WorkItemDbQuery> Get()
         {
             await EnsureDbMigrationRuns();
             return new WorkItemDbQuery(_cnn, _tz);
         }
 
-        private async Task EnsureDbMigrationRuns()
+        private async ValueTask EnsureDbMigrationRuns()
         {
             if (!_dbMigrationRan)
             {

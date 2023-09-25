@@ -25,7 +25,7 @@ namespace NQueue.Internal.Workers
             _config = config;
         }
 
-        protected internal override async Task<bool> ExecuteOne()
+        protected internal override async ValueTask<bool> ExecuteOne()
         {
             var logger = CreateLogger();
             logger.Log(LogLevel.Information, "Looking for work");

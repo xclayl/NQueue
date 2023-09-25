@@ -33,13 +33,13 @@ namespace NQueue.Sample
             {
                 config.ConnectionString = new SqlConnectionStringBuilder
                 {
-                    DataSource = "localhost,1533",
-                    InitialCatalog = "NQueueTest",
+                    DataSource = "localhost,15533",
+                    InitialCatalog = "NQueueSample",
                     UserID = "NQueueUser",
-                    Password = "a_$trong_p4ssword"
+                    Password = "ihSH3jqeVb7giIgOkohX"
                 }.ToString();
 
-                return Task.CompletedTask;
+                return default;
             });
         }
 

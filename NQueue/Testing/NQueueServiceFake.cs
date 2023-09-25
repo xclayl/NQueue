@@ -13,9 +13,9 @@ namespace NQueue.Testing
             _testServiceFake = testServiceFake;
         }
 
-        public Task<(bool healthy, string stateInfo)> HealthCheck() => Task.FromResult((true, "Testing Service"));
+        public ValueTask<(bool healthy, string stateInfo)> HealthCheck() => new ValueTask<(bool healthy, string stateInfo)>((true, "Testing Service"));
 
-        public async Task Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null, bool duplicatePrevention = false)
+        public async ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null, bool duplicatePrevention = false)
         {
             await _testServiceFake.EnqueueWorkItem(url, queueName, tran, debugInfo, duplicatePrevention);
         }

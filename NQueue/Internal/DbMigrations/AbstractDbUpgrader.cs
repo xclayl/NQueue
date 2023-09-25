@@ -7,7 +7,7 @@ namespace NQueue.Internal.DbMigrations
 {
     internal abstract class AbstractDbUpgrader
     {
-        public abstract Task Upgrade(string cnn);
+        public abstract ValueTask Upgrade(string cnn);
 
 
         /// <summary>

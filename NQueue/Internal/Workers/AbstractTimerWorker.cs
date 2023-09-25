@@ -33,7 +33,7 @@ namespace NQueue.Internal.Workers
 
         protected ILogger CreateLogger() => _loggerFactory.CreateLogger(_loggerCategoryName);
 
-        public async Task ExecuteAsync(CancellationToken stoppingToken)
+        public async ValueTask ExecuteAsync(CancellationToken stoppingToken)
         {
             var logger = CreateLogger();
 
@@ -103,7 +103,7 @@ namespace NQueue.Internal.Workers
             return t.ToOffset(tz.GetUtcOffset(t));
         }
 
-        protected internal abstract Task<bool> ExecuteOne();
+        protected internal abstract ValueTask<bool> ExecuteOne();
     }
 
 }

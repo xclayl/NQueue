@@ -55,7 +55,7 @@ namespace NQueue.Internal
         }
         
         
-        public static async Task ExecuteNonQuery(string sql, string cnn, params DbParameter[] p)
+        public static async ValueTask ExecuteNonQuery(string sql, string cnn, params DbParameter[] p)
         {
             await using var conn = new SqlConnection(cnn);
             await conn.OpenAsync();
@@ -76,7 +76,7 @@ namespace NQueue.Internal
                 yield return row(reader);
         }
 
-        public static async Task ExecuteNonQuery(DbTransaction tran, string sql, params DbParameter[] p)
+        public static async ValueTask ExecuteNonQuery(DbTransaction tran, string sql, params DbParameter[] p)
         {
             await using var cmd = tran.Connection.CreateCommand();
             cmd.CommandText = sql;

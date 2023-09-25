@@ -13,12 +13,12 @@ namespace NQueue.Internal
 
     internal class ConfigFactory : IDisposable
     {
-        private readonly Func<IServiceProvider, NQueueServiceConfig, Task>? _configBuilder;
+        private readonly Func<IServiceProvider, NQueueServiceConfig, ValueTask>? _configBuilder;
         private NQueueServiceConfig? _config;
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
         private readonly IServiceProvider? _serviceProvider;
 
-        public ConfigFactory(Func<IServiceProvider, NQueueServiceConfig, Task> configBuilder,
+        public ConfigFactory(Func<IServiceProvider, NQueueServiceConfig, ValueTask> configBuilder,
             IServiceProvider serviceProvider)
         {
             _configBuilder = configBuilder;
@@ -30,7 +30,7 @@ namespace NQueue.Internal
             _config = config;
         }
 
-        public async Task<NQueueServiceConfig> GetConfig()
+        public async ValueTask<NQueueServiceConfig> GetConfig()
         {
             await _lock.WaitAsync();
             try

@@ -6,7 +6,7 @@ namespace NQueue
 
     public interface INQueueService
     {
-        Task<(bool healthy, string stateInfo)> HealthCheck();
+        ValueTask<(bool healthy, string stateInfo)> HealthCheck();
         void PollNow();
     }
 
@@ -20,7 +20,7 @@ namespace NQueue
         }
 
 
-        public async Task<(bool healthy, string stateInfo)> HealthCheck() => await _state.HealthCheck();
+        public async ValueTask<(bool healthy, string stateInfo)> HealthCheck() => await _state.HealthCheck();
 
         public void PollNow() => _state.PollNow();
     }

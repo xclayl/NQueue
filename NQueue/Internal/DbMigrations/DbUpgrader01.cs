@@ -7,7 +7,7 @@ namespace NQueue.Internal.DbMigrations
 {
     internal class DbUpgrader01 : AbstractDbUpgrader
     {
-        public override async Task Upgrade(string cnn)
+        public override async ValueTask Upgrade(string cnn)
         {
             var sql = @"
 GO

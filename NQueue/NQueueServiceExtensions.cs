@@ -11,7 +11,7 @@ namespace NQueue
     public static class NQueueServiceExtensions
     {
         public static IServiceCollection AddNQueueHostedService(this IServiceCollection services,
-            Func<IServiceProvider, NQueueServiceConfig, Task> configBuilder)
+            Func<IServiceProvider, NQueueServiceConfig, ValueTask> configBuilder)
         {
 
             services.RemoveAll<InternalConfig>();

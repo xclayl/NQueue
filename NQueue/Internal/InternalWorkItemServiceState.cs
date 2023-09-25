@@ -12,10 +12,10 @@ namespace NQueue.Internal
 
     internal interface IInternalWorkItemServiceState
     {
-        Task<(bool healthy, string stateInfo)> HealthCheck();
+        ValueTask<(bool healthy, string stateInfo)> HealthCheck();
         void Configure(IReadOnlyList<IWorker> workers);
 
-        Task EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
+        ValueTask EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
             bool duplicatePrevention);
 
         void PollNow();
@@ -34,7 +34,7 @@ namespace NQueue.Internal
             _configFactory = configFactory;
         }
 
-        public async Task<(bool healthy, string stateInfo)> HealthCheck()
+        public async ValueTask<(bool healthy, string stateInfo)> HealthCheck()
         {
             var workers = _workers;
 
@@ -90,7 +90,7 @@ namespace NQueue.Internal
         }
 
 
-        public async Task EnqueueWorkItem(Uri url, string queueName, DbTransaction? tran, string? debugInfo,
+        public async ValueTask EnqueueWorkItem(Uri url, string queueName, DbTransaction? tran, string? debugInfo,
             bool duplicatePrevention)
         {
             if (tran == null)
@@ -99,7 +99,7 @@ namespace NQueue.Internal
                 await EnqueueWorkItem(tran, queueName, url, debugInfo, duplicatePrevention);
         }
 
-        private async Task EnqueueWorkItem(string queueName, Uri url, string? debugInfo,
+        private async ValueTask EnqueueWorkItem(string queueName, Uri url, string? debugInfo,
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();
@@ -110,7 +110,7 @@ namespace NQueue.Internal
         }
 
 
-        private async Task EnqueueWorkItem(DbTransaction tran, string queueName, Uri url, string? debugInfo,
+        private async ValueTask EnqueueWorkItem(DbTransaction tran, string queueName, Uri url, string? debugInfo,
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();

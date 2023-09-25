@@ -29,7 +29,7 @@ namespace NQueue.Sample.Controllers
             return Ok("Done");
         }
 
-        public async Task<IActionResult> Enqueue()
+        public async ValueTask<IActionResult> Enqueue()
         {
             await _client.Enqueue(new Uri(FindLocalhost(), Url.Action("NoOp")));
             return Ok("Enqueue Done");

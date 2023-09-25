@@ -26,7 +26,7 @@ namespace NQueue.Internal
             await _tran.CommitAsync();
         }
 
-        public async Task EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
+        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
         {
             await ExecuteNonQuery(
                 "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection",
@@ -39,7 +39,7 @@ namespace NQueue.Internal
         }
 
 
-        public async Task<int> CreateCronJob(string name)
+        public async ValueTask<int> CreateCronJob(string name)
         {
             await ExecuteNonQuery(
                 "SELECT TOP 1 * FROM [NQueue].CronJob cj WITH (UPDLOCK,HOLDLOCK,TABLOCK);"
@@ -58,7 +58,7 @@ namespace NQueue.Internal
             return (await rows.ToListAsync()).Single();
         }
 
-        public async Task<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(int cronJobId)
+        public async ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(int cronJobId)
         {
             var rowEnumerable = ExecuteReader(
                 "SELECT CAST(LastRanAt AT TIME ZONE 'UTC' AS DATETIME) AS LastRanAtUtc, Active FROM [NQueue].CronJob cj WITH (UPDLOCK,HOLDLOCK) WHERE CronJobId=@CronJobId",
@@ -75,7 +75,7 @@ namespace NQueue.Internal
             return (row.LastRanAt, row.Active);
         }
 
-        public async Task UpdateCronJobLastRanAt(int cronJobId)
+        public async ValueTask UpdateCronJobLastRanAt(int cronJobId)
         {
             await ExecuteNonQuery(
                 "UPDATE cj SET LastRanAt = @LastRanAt FROM [NQueue].CronJob cj WHERE CronJobId=@CronJobId",
@@ -84,7 +84,7 @@ namespace NQueue.Internal
             );
         }
 
-        private async Task ExecuteNonQuery(string sql, params DbParameter[] p)
+        private async ValueTask ExecuteNonQuery(string sql, params DbParameter[] p)
         {
             await using var cmd = _tran.Connection.CreateCommand();
             cmd.CommandText = sql;

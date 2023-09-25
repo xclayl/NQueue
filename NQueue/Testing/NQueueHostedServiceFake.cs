@@ -21,13 +21,13 @@ namespace NQueue.Testing
             _state = new InternalWorkItemServiceState(new ConfigFactory(config));
         }
 
-        public async Task EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
+        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
             bool duplicatePrevention)
         {
             await _state.EnqueueWorkItem(url, queueName, tran, debugInfo, duplicatePrevention);
         }
 
-        public async Task PollNow(HttpClient client)
+        public async ValueTask PollNow(HttpClient client)
         {
             var consumer = new WorkItemConsumer("testing",
                 TimeSpan.Zero,

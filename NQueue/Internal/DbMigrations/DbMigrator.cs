@@ -10,7 +10,7 @@ namespace NQueue.Internal.DbMigrations
         
         
         
-        public static async Task UpdateDbSchema(string cnn)
+        public static async ValueTask UpdateDbSchema(string cnn)
         {
             await using var conn = new SqlConnection(cnn);
             await conn.OpenAsync();

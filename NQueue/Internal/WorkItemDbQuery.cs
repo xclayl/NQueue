@@ -19,7 +19,7 @@ namespace NQueue.Internal
         }
 
 
-        public async Task<WorkItemDbTransaction> BeginTran()
+        public async ValueTask<WorkItemDbTransaction> BeginTran()
         {
             var conn = new SqlConnection(_cnn);
             await conn.OpenAsync();
@@ -28,7 +28,7 @@ namespace NQueue.Internal
 
 
 
-        public async Task<WorkItemInfo?> NextWorkItem()
+        public async ValueTask<WorkItemInfo?> NextWorkItem()
         {
             var rows = ExecuteReader("EXEC [NQueue].[NextWorkItem] @Now=@Now",
                 _cnn,
@@ -45,7 +45,7 @@ namespace NQueue.Internal
         }
 
 
-        public async Task CompleteWorkItem(int workItemId)
+        public async ValueTask CompleteWorkItem(int workItemId)
         {
             await ExecuteNonQuery(
                 "EXEC [NQueue].[CompleteWorkItem] @WorkItemID=@WorkItemID, @Now=@Now",
@@ -55,7 +55,7 @@ namespace NQueue.Internal
             );
         }
 
-        public async Task FailWorkItem(int workItemId)
+        public async ValueTask FailWorkItem(int workItemId)
         {
             await ExecuteNonQuery(
                 "EXEC [NQueue].[FailWorkItem] @WorkItemID=@WorkItemID, @Now=@Now",
@@ -65,7 +65,7 @@ namespace NQueue.Internal
             );
         }
 
-        // public async Task ReplayRequest(int requestId)
+        // public async ValueTask ReplayRequest(int requestId)
         // {
         //     await ExecuteNonQuery(
         //         "EXEC [NQueue].[ReplayWorkItem] @RequestID=@WorkItemID, @Now=@Now",
@@ -74,7 +74,7 @@ namespace NQueue.Internal
         //     );
         // }
 
-        public async Task PurgeWorkItems()
+        public async ValueTask PurgeWorkItems()
         {
             await ExecuteNonQuery(
                 "EXEC [NQueue].[PurgeWorkItems] @Now=@Now",
@@ -83,7 +83,7 @@ namespace NQueue.Internal
             );
         }
 
-        public async Task<IReadOnlyList<CronJobInfo>> GetCronJobState()
+        public async ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState()
         {
             var rows = ExecuteReader(
                 "SELECT [CronJobId], [CronJobName], CAST(LastRanAt AT TIME ZONE 'UTC' AS DATETIME) AS LastRanAtUtc FROM [NQueue].CronJob",
@@ -98,7 +98,7 @@ namespace NQueue.Internal
         }
 
 
-        public async Task<(bool healthy, int countUnhealthy)> QueueHealthCheck()
+        public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()
         {
             var rows = ExecuteReader(
                 "SELECT COUNT(*) FROM [NQueue].[Queue] WHERE ErrorCount >= 5",
@@ -111,7 +111,7 @@ namespace NQueue.Internal
         }
 
 
-        public async Task EnqueueWorkItem(Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
+        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
         {
             await ExecuteNonQuery(
                 "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection",
@@ -124,7 +124,7 @@ namespace NQueue.Internal
             );
         }
 
-        public static async Task EnqueueWorkItem(DbTransaction tran, TimeZoneInfo tz, Uri url, string? queueName, 
+        public static async ValueTask EnqueueWorkItem(DbTransaction tran, TimeZoneInfo tz, Uri url, string? queueName, 
             string? debugInfo, bool duplicateProtection)
         {
             await ExecuteNonQuery(

@@ -21,7 +21,7 @@ namespace NQueue.Internal.Workers
             _configFactory = configFactory;
         }
 
-        protected internal override async Task<bool> ExecuteOne()
+        protected internal override async ValueTask<bool> ExecuteOne()
         {
             var query = await _contextFactory.Get();
             var cronJobState = (await query.GetCronJobState())
@@ -54,7 +54,7 @@ namespace NQueue.Internal.Workers
             return false;
         }
 
-        private async Task ProcessCron(CronJobInfo? state, NQueueCronJob nQueueCronJob, WorkItemDbQuery query)
+        private async ValueTask ProcessCron(CronJobInfo? state, NQueueCronJob nQueueCronJob, WorkItemDbQuery query)
         {
             await using var tran = await query.BeginTran();
 

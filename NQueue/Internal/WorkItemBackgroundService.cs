@@ -35,7 +35,7 @@ namespace NQueue.Internal
             }
         }
 
-        private async Task RunUntilStopped(CancellationToken stoppingToken)
+        private async ValueTask RunUntilStopped(CancellationToken stoppingToken)
         {
             while (true)
             {

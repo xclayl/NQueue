@@ -1,0 +1,67 @@
+version: '3.7'
+
+services:
+
+
+  mssql:
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    container_name: nqueue-mssql
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2GB
+    environment:
+      MSSQL_SA_PASSWORD: ihSH3jqeVb7giIgOkohX
+      ACCEPT_EULA: 1
+    ports:
+      - "15533:1433"
+    networks:
+      - mynet
+    volumes:
+      - nqueue-mssql-data:/var/opt/mssql
+
+
+      
+  pgsql:
+    image: postgres:16-alpine
+    container_name: nqueue-pgsql
+    command: ["postgres", "-c", "log_statement=all", "-c", "log_destination=stderr"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ihSH3jqeVb7giIgOkohX
+    ports:
+      - "15532:5432"
+    networks:
+      - mynet
+    volumes:
+      - nqueue-pgsql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d postgres -U postgres"]
+      interval: 5s
+      timeout: 1s
+      retries: 30
+      start_period: 5s
+
+ # redis:
+ #   image: redis:6-alpine
+ #   container_name: nqueue-redis
+ #   restart: unless-stopped
+ #   ports:
+ #     - "16379:6379"
+
+
+  
+
+
+networks:
+  mynet:
+    driver: bridge
+
+
+volumes:
+
+  nqueue-mssql-data:
+    name: nqueue-mssql-data
+  nqueue-pgsql-data:
+    name: nqueue-pgsql-data

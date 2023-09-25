@@ -30,7 +30,7 @@ namespace NQueue.Internal
         }
 
 
-        public async Task ExecuteAsync(CancellationToken stoppingToken)
+        public async ValueTask ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation("starting work request background services");
 
@@ -70,7 +70,7 @@ namespace NQueue.Internal
                         {
                             _serviceState.Configure(workers);
 
-                            await Task.WhenAll(workers.Select(w => w.ExecuteAsync(comboCt.Token)));
+                            await Task.WhenAll(workers.Select(w => w.ExecuteAsync(comboCt.Token).AsTask()));
                         }
                         else
                         {
@@ -96,7 +96,7 @@ namespace NQueue.Internal
             _logger.LogInformation("Shutting down work request workers");
         }
 
-        private async Task RunUntilStopped(CancellationToken stoppingToken)
+        private async ValueTask RunUntilStopped(CancellationToken stoppingToken)
         {
             while (true)
             {
