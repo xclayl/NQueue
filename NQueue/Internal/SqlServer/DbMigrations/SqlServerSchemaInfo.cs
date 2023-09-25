@@ -1,8 +1,8 @@
 ﻿namespace NQueue.Internal.SqlServer.DbMigrations
 {
-    internal class SchemaInfo
+    internal class SqlServerSchemaInfo
     {   
-        public SchemaInfo(string type, string name)
+        public SqlServerSchemaInfo(string type, string name)
         {
             Type = type;
             Name = name;

@@ -30,7 +30,7 @@ namespace NQueue
 
         internal IWorkItemDbConnection GetWorkItemDbConnection()
         {
-            return new WorkItemDbConnection(this);
+            return new SqlServerWorkItemDbConnection(this);
         }
 
     }

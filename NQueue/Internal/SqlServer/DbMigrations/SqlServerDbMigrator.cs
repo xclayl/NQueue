@@ -5,7 +5,7 @@ using Microsoft.Data.SqlClient;
 
 namespace NQueue.Internal.SqlServer.DbMigrations
 {
-    internal class DbMigrator
+    internal class SqlServerDbMigrator
     {
         
         
@@ -15,7 +15,7 @@ namespace NQueue.Internal.SqlServer.DbMigrations
             await using var conn = new SqlConnection(cnn);
             await conn.OpenAsync();
             await using var tran = await conn.BeginTransactionAsync();
-            await AbstractWorkItemDb.ExecuteNonQuery(tran, @"
+            await SqlServerAbstractWorkItemDb.ExecuteNonQuery(tran, @"
 DECLARE @result int;  
 EXEC @result = sp_getapplock @Resource = 'NQueue-schema-upgrade', @LockMode = 'Exclusive', @LockTimeout = 30000; 
 IF @result < 0  
@@ -30,14 +30,14 @@ END
             while (currentVersion != 1)
             {
                 
-                var dbObjects = await AbstractWorkItemDb.ExecuteReader(@"
+                var dbObjects = await SqlServerAbstractWorkItemDb.ExecuteReader(@"
                     select 'schema' AS [type], s.SCHEMA_NAME AS [name] from INFORMATION_SCHEMA.SCHEMATA s where s.SCHEMA_NAME = 'NQueue'
                     UNION
                     select 'table' AS [type], t.TABLE_NAME FROM INFORMATION_SCHEMA.TABLES t WHERE t.TABLE_SCHEMA = 'NQueue'
                     UNION
                     select 'routine' AS [type], r.ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'NQueue';
                     ", cnn,
-                        reader => new SchemaInfo(
+                        reader => new SqlServerSchemaInfo(
                         reader.GetString(0),
                         reader.GetString(1)
                     )
@@ -50,7 +50,7 @@ END
 
                     currentVersion = 0;
                 }
-                else if (new DbUpgrader01().IsMyVersion(dbObjects))
+                else if (new SqlServerDbUpgrader01().IsMyVersion(dbObjects))
                 {
                     currentVersion = 1;
                 }
@@ -62,7 +62,7 @@ END
 
                 if (currentVersion == 0)
                 {
-                    await new DbUpgrader01().Upgrade(cnn);
+                    await new SqlServerDbUpgrader01().Upgrade(cnn);
                 }
             }
 

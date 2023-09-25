@@ -32,11 +32,11 @@ namespace NQueue.Testing
         {
             var consumer = new WorkItemConsumer("testing",
                 TimeSpan.Zero,
-                new WorkItemDbConnection(_config),
+                _config.GetWorkItemDbConnection(),
                 new MyHttpClientFactory(client),
                 _config,
                 _loggerFactory);
-
+        
             var hasMore = true;
             while (hasMore)
             {
@@ -47,12 +47,12 @@ namespace NQueue.Testing
         private class MyHttpClientFactory : IHttpClientFactory
         {
             private readonly HttpClient _client;
-
+        
             public MyHttpClientFactory(HttpClient client)
             {
                 _client = client;
             }
-
+        
             public HttpClient CreateClient(string name) => _client;
         }
 

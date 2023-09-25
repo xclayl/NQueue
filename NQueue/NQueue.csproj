@@ -22,6 +22,7 @@
 
     <ItemGroup>
       <Folder Include="Internal\DbMigrations\" />
+      <Folder Include="Internal\Postgres\" />
     </ItemGroup>
 
 </Project>

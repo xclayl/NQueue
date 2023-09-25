@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace NQueue.Internal.SqlServer.DbMigrations
 {
-    internal abstract class AbstractDbUpgrader
+    internal abstract class SqlServerAbstractDbUpgrader
     {
         public abstract ValueTask Upgrade(string cnn);
 

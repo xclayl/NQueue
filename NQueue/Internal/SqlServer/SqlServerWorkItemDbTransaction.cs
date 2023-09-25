@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 namespace NQueue.Internal.SqlServer
 {
 
-    internal class WorkItemDbTransaction : AbstractWorkItemDb, IWorkItemDbTransaction
+    internal class SqlServerWorkItemDbTransaction : SqlServerAbstractWorkItemDb, IWorkItemDbTransaction
 
     {
     private readonly DbTransaction _tran;
 
-    public WorkItemDbTransaction(DbTransaction tran, TimeZoneInfo tz) : base(tz)
+    public SqlServerWorkItemDbTransaction(DbTransaction tran, TimeZoneInfo tz) : base(tz)
     {
         _tran = tran;
     }

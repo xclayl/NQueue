@@ -9,11 +9,11 @@ using NQueue.Internal.Model;
 namespace NQueue.Internal.SqlServer
 {
 
-    internal class WorkItemDbQuery : AbstractWorkItemDb, IWorkItemDbQuery
+    internal class SqlServerWorkItemDbQuery : SqlServerAbstractWorkItemDb, IWorkItemDbQuery
     {
         private readonly string _cnn;
 
-        public WorkItemDbQuery(string cnn, TimeZoneInfo tz) : base(tz)
+        public SqlServerWorkItemDbQuery(string cnn, TimeZoneInfo tz) : base(tz)
         {
             _cnn = cnn;
         }
@@ -23,7 +23,7 @@ namespace NQueue.Internal.SqlServer
         {
             var conn = new SqlConnection(_cnn);
             await conn.OpenAsync();
-            return new WorkItemDbTransaction(await conn.BeginTransactionAsync(), _tz);
+            return new SqlServerWorkItemDbTransaction(await conn.BeginTransactionAsync(), _tz);
         }
 
 

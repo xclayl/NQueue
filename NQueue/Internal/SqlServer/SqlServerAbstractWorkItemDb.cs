@@ -8,11 +8,11 @@ using Microsoft.Data.SqlClient;
 namespace NQueue.Internal.SqlServer
 {
 
-    internal abstract class AbstractWorkItemDb
+    internal abstract class SqlServerAbstractWorkItemDb
     {
         protected readonly TimeZoneInfo _tz;
 
-        protected AbstractWorkItemDb(TimeZoneInfo tz)
+        protected SqlServerAbstractWorkItemDb(TimeZoneInfo tz)
         {
             _tz = tz;
         }

@@ -9,14 +9,14 @@ namespace NQueue.Internal.SqlServer
 
 
 
-    internal class WorkItemDbConnection : IWorkItemDbConnection
+    internal class SqlServerWorkItemDbConnection : IWorkItemDbConnection
     {
         private readonly string _cnn;
         private readonly TimeZoneInfo _tz;
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
         private volatile bool _dbMigrationRan = false;
 
-        internal WorkItemDbConnection(NQueueServiceConfig config)
+        internal SqlServerWorkItemDbConnection(NQueueServiceConfig config)
         {
             _cnn = config.CheckedConnectionString;
             _tz = config.TimeZone;
@@ -25,7 +25,7 @@ namespace NQueue.Internal.SqlServer
         public async ValueTask<IWorkItemDbQuery> Get()
         {
             await EnsureDbMigrationRuns();
-            return new WorkItemDbQuery(_cnn, _tz);
+            return new SqlServerWorkItemDbQuery(_cnn, _tz);
         }
 
         private async ValueTask EnsureDbMigrationRuns()
@@ -37,7 +37,7 @@ namespace NQueue.Internal.SqlServer
                 {
                     if (!_dbMigrationRan)
                     {
-                        await DbMigrator.UpdateDbSchema(_cnn);
+                        await SqlServerDbMigrator.UpdateDbSchema(_cnn);
 
                         _dbMigrationRan = true;
                     }
@@ -52,7 +52,7 @@ namespace NQueue.Internal.SqlServer
         public async ValueTask EnqueueWorkItem(DbTransaction tran, TimeZoneInfo tz, Uri url, string? queueName,
             string? debugInfo, bool duplicateProtection)
         {
-            await WorkItemDbQuery.EnqueueWorkItem(tran, tz, url, queueName, debugInfo, duplicateProtection);
+            await SqlServerWorkItemDbQuery.EnqueueWorkItem(tran, tz, url, queueName, debugInfo, duplicateProtection);
         }
     }
 }

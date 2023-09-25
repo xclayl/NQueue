@@ -5,7 +5,7 @@ using Microsoft.Data.SqlClient;
 
 namespace NQueue.Internal.SqlServer.DbMigrations
 {
-    internal class DbUpgrader01 : AbstractDbUpgrader
+    internal class SqlServerDbUpgrader01 : SqlServerAbstractDbUpgrader
     {
         public override async ValueTask Upgrade(string cnn)
         {
@@ -469,7 +469,7 @@ END
 
             foreach (var batch in batches)
             {
-	            await AbstractWorkItemDb.ExecuteNonQuery(tran, batch);
+	            await SqlServerAbstractWorkItemDb.ExecuteNonQuery(tran, batch);
             }
 
 
@@ -480,7 +480,7 @@ END
 
         
         
-        public bool IsMyVersion(IReadOnlyList<SchemaInfo> dbObjects)
+        public bool IsMyVersion(IReadOnlyList<SqlServerSchemaInfo> dbObjects)
         {
             var expectedTables = new[]
             {

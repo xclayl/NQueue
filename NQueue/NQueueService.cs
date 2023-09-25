@@ -22,6 +22,9 @@ namespace NQueue
 
         public async ValueTask<(bool healthy, string stateInfo)> HealthCheck() => await _state.HealthCheck();
 
+        /// <summary>
+        /// Wakes up background threads to look for work.  This is very fast - feel free to call as many times as you'd like.
+        /// </summary>
         public void PollNow() => _state.PollNow();
     }
 }
