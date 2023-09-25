@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using NQueue.Internal;
+using NQueue.Internal.SqlServer;
 
 namespace NQueue
 {
@@ -25,6 +27,11 @@ namespace NQueue
         }
 
         public TimeZoneInfo TimeZone { get; set; } = TimeZoneInfo.Local;
+
+        internal IWorkItemDbConnection GetWorkItemDbConnection()
+        {
+            return new WorkItemDbConnection(this);
+        }
 
     }
 }

@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using NQueue.Internal.Model;
 
-namespace NQueue.Internal
+namespace NQueue.Internal.SqlServer
 {
 
-    internal class WorkItemDbQuery : AbstractWorkItemDb
+    internal class WorkItemDbQuery : AbstractWorkItemDb, IWorkItemDbQuery
     {
         private readonly string _cnn;
 
@@ -19,7 +19,7 @@ namespace NQueue.Internal
         }
 
 
-        public async ValueTask<WorkItemDbTransaction> BeginTran()
+        public async ValueTask<IWorkItemDbTransaction> BeginTran()
         {
             var conn = new SqlConnection(_cnn);
             await conn.OpenAsync();

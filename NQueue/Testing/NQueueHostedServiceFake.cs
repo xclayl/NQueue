@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NQueue.Internal;
+using NQueue.Internal.SqlServer;
 using NQueue.Internal.Workers;
 
 namespace NQueue.Testing
@@ -31,7 +32,7 @@ namespace NQueue.Testing
         {
             var consumer = new WorkItemConsumer("testing",
                 TimeSpan.Zero,
-                new WorkItemContextFactory(_config),
+                new WorkItemDbConnection(_config),
                 new MyHttpClientFactory(client),
                 _config,
                 _loggerFactory);

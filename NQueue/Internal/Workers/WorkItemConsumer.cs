@@ -9,10 +9,10 @@ namespace NQueue.Internal.Workers
     internal class WorkItemConsumer : AbstractTimerWorker
     {
         private readonly NQueueServiceConfig _config;
-        private readonly WorkItemContextFactory _contextFactory;
+        private readonly IWorkItemDbConnection _workItemDbConnection;
         private readonly IHttpClientFactory _httpClientFactory;
 
-        public WorkItemConsumer(string runnerName, TimeSpan pollInterval, WorkItemContextFactory contextFactory,
+        public WorkItemConsumer(string runnerName, TimeSpan pollInterval, IWorkItemDbConnection workItemDbConnection,
             IHttpClientFactory httpClientFactory, NQueueServiceConfig config, ILoggerFactory loggerFactory) : base(
             pollInterval,
             $"{typeof(WorkItemConsumer).FullName}.{runnerName}",
@@ -20,7 +20,7 @@ namespace NQueue.Internal.Workers
             loggerFactory
         )
         {
-            _contextFactory = contextFactory;
+            _workItemDbConnection = workItemDbConnection;
             _httpClientFactory = httpClientFactory;
             _config = config;
         }
@@ -30,7 +30,7 @@ namespace NQueue.Internal.Workers
             var logger = CreateLogger();
             logger.Log(LogLevel.Information, "Looking for work");
             
-            var query = await _contextFactory.Get();
+            var query = await _workItemDbConnection.Get();
             var request = await query.NextWorkItem();
 
             if (request == null)

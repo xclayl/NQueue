@@ -39,7 +39,7 @@ namespace NQueue.Internal
                 {
                     var config = await _configFactory.GetConfig();
 
-                    var ctxFactory = new WorkItemContextFactory(config);
+                    var conn = config.GetWorkItemDbConnection();
 
                     while (!stoppingToken.IsCancellationRequested)
                     {
@@ -52,7 +52,7 @@ namespace NQueue.Internal
 
 
                         var queueConsumers = Enumerable.Range(0, config.QueueRunners)
-                            .Select(i => new WorkItemConsumer($"{i}", config.PollInterval, ctxFactory,
+                            .Select(i => new WorkItemConsumer($"{i}", config.PollInterval, conn,
                                 _httpClientFactory, config, _loggerFactory))
                             .ToList();
 
@@ -60,7 +60,7 @@ namespace NQueue.Internal
 
                         if (config.CronJobs.Any())
                         {
-                            var cronWorker = new CronJobWorker(ctxFactory, config.TimeZone, _configFactory,
+                            var cronWorker = new CronJobWorker(conn, config.TimeZone, _configFactory,
                                 _loggerFactory);
                             workers.Add(cronWorker);
                         }

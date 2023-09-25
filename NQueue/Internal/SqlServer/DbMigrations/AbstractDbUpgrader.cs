@@ -3,7 +3,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NQueue.Internal.DbMigrations
+namespace NQueue.Internal.SqlServer.DbMigrations
 {
     internal abstract class AbstractDbUpgrader
     {

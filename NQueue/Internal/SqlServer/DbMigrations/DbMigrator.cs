@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
-namespace NQueue.Internal.DbMigrations
+namespace NQueue.Internal.SqlServer.DbMigrations
 {
     internal class DbMigrator
     {

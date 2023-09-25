@@ -15,8 +15,8 @@ namespace NQueue.Internal
         ValueTask<(bool healthy, string stateInfo)> HealthCheck();
         void Configure(IReadOnlyList<IWorker> workers);
 
-        ValueTask EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
-            bool duplicatePrevention);
+        // ValueTask EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
+        //     bool duplicatePrevention);
 
         void PollNow();
     }
@@ -53,10 +53,10 @@ namespace NQueue.Internal
 
             var config = await _configFactory.GetConfig();
 
-            var ctxFactory = new WorkItemContextFactory(config);
+            var conn = config.GetWorkItemDbConnection();
 
-            var ctx = await ctxFactory.Get();
-            var queueState = await ctx.QueueHealthCheck();
+            var query = await conn.Get();
+            var queueState = await query.QueueHealthCheck();
 
             states = states.Concat(new[]
                 {
@@ -103,10 +103,10 @@ namespace NQueue.Internal
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();
-            var ctxFactory = new WorkItemContextFactory(config);
+            var conn = config.GetWorkItemDbConnection();
 
-            var ctx = await ctxFactory.Get();
-            await ctx.EnqueueWorkItem(url, queueName, debugInfo, duplicatePrevention);
+            var query = await conn.Get();
+            await query.EnqueueWorkItem(url, queueName, debugInfo, duplicatePrevention);
         }
 
 
@@ -114,7 +114,8 @@ namespace NQueue.Internal
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();
-            await WorkItemDbQuery.EnqueueWorkItem(tran, config.TimeZone, url, queueName, debugInfo, duplicatePrevention);
+            var conn = config.GetWorkItemDbConnection();
+            await conn.EnqueueWorkItem(tran, config.TimeZone, url, queueName, debugInfo, duplicatePrevention);
         }
 
 

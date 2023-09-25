@@ -19,4 +19,9 @@
       <PackageReference Include="System.Linq.Async" Version="4.1.1" />
     </ItemGroup>
 
+
+    <ItemGroup>
+      <Folder Include="Internal\DbMigrations\" />
+    </ItemGroup>
+
 </Project>

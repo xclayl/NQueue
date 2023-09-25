@@ -10,20 +10,20 @@ namespace NQueue.Internal.Workers
 
     internal class CronJobWorker : AbstractTimerWorker
     {
-        private readonly WorkItemContextFactory _contextFactory;
+        private readonly IWorkItemDbConnection _workItemDbConnection;
         private readonly ConfigFactory _configFactory;
 
-        public CronJobWorker(WorkItemContextFactory contextFactory, TimeZoneInfo tz, ConfigFactory configFactory,
+        public CronJobWorker(IWorkItemDbConnection workItemDbConnection, TimeZoneInfo tz, ConfigFactory configFactory,
             ILoggerFactory loggerFactory) : base(TimeSpan.FromMinutes(1),
             typeof(CronJobWorker).FullName, tz, loggerFactory)
         {
-            _contextFactory = contextFactory;
+            _workItemDbConnection = workItemDbConnection;
             _configFactory = configFactory;
         }
 
         protected internal override async ValueTask<bool> ExecuteOne()
         {
-            var query = await _contextFactory.Get();
+            var query = await _workItemDbConnection.Get();
             var cronJobState = (await query.GetCronJobState())
                 .ToDictionary(r => r.CronJobName);
 
@@ -54,7 +54,7 @@ namespace NQueue.Internal.Workers
             return false;
         }
 
-        private async ValueTask ProcessCron(CronJobInfo? state, NQueueCronJob nQueueCronJob, WorkItemDbQuery query)
+        private async ValueTask ProcessCron(CronJobInfo? state, NQueueCronJob nQueueCronJob, IWorkItemDbQuery query)
         {
             await using var tran = await query.BeginTran();
 

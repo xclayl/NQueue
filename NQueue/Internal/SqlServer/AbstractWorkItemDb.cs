@@ -5,7 +5,7 @@ using System.Data.Common;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 
-namespace NQueue.Internal
+namespace NQueue.Internal.SqlServer
 {
 
     internal abstract class AbstractWorkItemDb

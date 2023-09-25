@@ -35,11 +35,11 @@ namespace NQueue
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();
-            var ctxFactory = new WorkItemContextFactory(config);
+            var conn = config.GetWorkItemDbConnection();
             
-            var ctx = await ctxFactory.Get();
+            var query = await conn.Get();
 
-            await ctx.EnqueueWorkItem(url, queueName, debugInfo, duplicatePrevention);
+            await query.EnqueueWorkItem(url, queueName, debugInfo, duplicatePrevention);
         }
 
 
@@ -47,7 +47,8 @@ namespace NQueue
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();
-            await WorkItemDbQuery.EnqueueWorkItem(tran, config.TimeZone, url, queueName, debugInfo, duplicatePrevention);
+            var conn = config.GetWorkItemDbConnection();
+            await conn.EnqueueWorkItem(tran, config.TimeZone, url, queueName, debugInfo, duplicatePrevention);
         }
 
     }
