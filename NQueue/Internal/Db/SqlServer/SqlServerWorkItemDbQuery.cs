@@ -3,27 +3,25 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
 using NQueue.Internal.Model;
 
-namespace NQueue.Internal.SqlServer
+namespace NQueue.Internal.Db.SqlServer
 {
 
-    internal class SqlServerWorkItemDbQuery : SqlServerAbstractWorkItemDb, IWorkItemDbQuery
+    internal class SqlServerWorkItemDbQuery : AbstractWorkItemDb, IWorkItemDbQuery
     {
-        private readonly string _cnn;
+        private readonly NQueueServiceConfig _config;
 
-        public SqlServerWorkItemDbQuery(string cnn, TimeZoneInfo tz) : base(tz)
+        public SqlServerWorkItemDbQuery(NQueueServiceConfig config) : base(config.TimeZone)
         {
-            _cnn = cnn;
+            _config = config;
         }
 
 
         public async ValueTask<IWorkItemDbTransaction> BeginTran()
         {
-            var conn = new SqlConnection(_cnn);
-            await conn.OpenAsync();
-            return new SqlServerWorkItemDbTransaction(await conn.BeginTransactionAsync(), _tz);
+            var conn = await _config.OpenDbConnection();
+            return new SqlServerWorkItemDbTransaction(await conn.BeginTransactionAsync(), conn, _tz);
         }
 
 
@@ -31,7 +29,7 @@ namespace NQueue.Internal.SqlServer
         public async ValueTask<WorkItemInfo?> NextWorkItem()
         {
             var rows = ExecuteReader("EXEC [NQueue].[NextWorkItem] @Now=@Now",
-                _cnn,
+                await _config.OpenDbConnection(),
                 reader => new WorkItemInfo(
                     reader.GetInt32(reader.GetOrdinal("WorkItemId")),
                     reader.GetString(reader.GetOrdinal("Url"))
@@ -49,7 +47,7 @@ namespace NQueue.Internal.SqlServer
         {
             await ExecuteNonQuery(
                 "EXEC [NQueue].[CompleteWorkItem] @WorkItemID=@WorkItemID, @Now=@Now",
-                _cnn,
+                await _config.OpenDbConnection(),
                 SqlParameter("@WorkItemID", workItemId),
                 SqlParameter("@Now", Now)
             );
@@ -59,7 +57,7 @@ namespace NQueue.Internal.SqlServer
         {
             await ExecuteNonQuery(
                 "EXEC [NQueue].[FailWorkItem] @WorkItemID=@WorkItemID, @Now=@Now",
-                _cnn,
+                await _config.OpenDbConnection(),
                 SqlParameter("@WorkItemID", workItemId),
                 SqlParameter("@Now", Now)
             );
@@ -78,7 +76,7 @@ namespace NQueue.Internal.SqlServer
         {
             await ExecuteNonQuery(
                 "EXEC [NQueue].[PurgeWorkItems] @Now=@Now",
-                _cnn,
+                await _config.OpenDbConnection(),
                 SqlParameter("@Now", Now)
             );
         }
@@ -87,7 +85,7 @@ namespace NQueue.Internal.SqlServer
         {
             var rows = ExecuteReader(
                 "SELECT [CronJobId], [CronJobName], CAST(LastRanAt AT TIME ZONE 'UTC' AS DATETIME) AS LastRanAtUtc FROM [NQueue].CronJob",
-                _cnn,
+                await _config.OpenDbConnection(),
                 reader => new CronJobInfo(
                     reader.GetInt32(0),
                     reader.GetString(1),
@@ -102,7 +100,7 @@ namespace NQueue.Internal.SqlServer
         {
             var rows = ExecuteReader(
                 "SELECT COUNT(*) FROM [NQueue].[Queue] WHERE ErrorCount >= 5",
-                _cnn,
+                await _config.OpenDbConnection(),
                 reader => reader.GetInt32(0));
 
             var count = await rows.SingleAsync();
@@ -115,7 +113,7 @@ namespace NQueue.Internal.SqlServer
         {
             await ExecuteNonQuery(
                 "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection",
-                _cnn,
+                await _config.OpenDbConnection(),
                 SqlParameter("@QueueName", queueName),
                 SqlParameter("@Url", url.ToString()),
                 SqlParameter("@DebugInfo", debugInfo),
@@ -138,11 +136,6 @@ namespace NQueue.Internal.SqlServer
             );
         }
 
-        private static DateTimeOffset NowIn(TimeZoneInfo tz)
-        {
-            var nowLocal = DateTimeOffset.Now;
-            return nowLocal.ToOffset(tz.GetUtcOffset(nowLocal));
-        }
 
     }
 }

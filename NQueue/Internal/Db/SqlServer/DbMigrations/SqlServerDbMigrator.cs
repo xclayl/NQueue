@@ -1,21 +1,19 @@
 ﻿using System;
+using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
 
-namespace NQueue.Internal.SqlServer.DbMigrations
+namespace NQueue.Internal.Db.SqlServer.DbMigrations
 {
     internal class SqlServerDbMigrator
     {
         
         
         
-        public static async ValueTask UpdateDbSchema(string cnn)
+        public static async ValueTask UpdateDbSchema(DbConnection conn)
         {
-            await using var conn = new SqlConnection(cnn);
-            await conn.OpenAsync();
             await using var tran = await conn.BeginTransactionAsync();
-            await SqlServerAbstractWorkItemDb.ExecuteNonQuery(tran, @"
+            await AbstractWorkItemDb.ExecuteNonQuery(tran, @"
 DECLARE @result int;  
 EXEC @result = sp_getapplock @Resource = 'NQueue-schema-upgrade', @LockMode = 'Exclusive', @LockTimeout = 30000; 
 IF @result < 0  
@@ -30,14 +28,15 @@ END
             while (currentVersion != 1)
             {
                 
-                var dbObjects = await SqlServerAbstractWorkItemDb.ExecuteReader(@"
+                var dbObjects = await AbstractWorkItemDb.ExecuteReader(
+                    tran, 
+                    @"
                     select 'schema' AS [type], s.SCHEMA_NAME AS [name] from INFORMATION_SCHEMA.SCHEMATA s where s.SCHEMA_NAME = 'NQueue'
                     UNION
                     select 'table' AS [type], t.TABLE_NAME FROM INFORMATION_SCHEMA.TABLES t WHERE t.TABLE_SCHEMA = 'NQueue'
                     UNION
                     select 'routine' AS [type], r.ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'NQueue';
-                    ", cnn,
-                        reader => new SqlServerSchemaInfo(
+                    ", reader => new SqlServerSchemaInfo(
                         reader.GetString(0),
                         reader.GetString(1)
                     )
@@ -62,7 +61,7 @@ END
 
                 if (currentVersion == 0)
                 {
-                    await new SqlServerDbUpgrader01().Upgrade(cnn);
+                    await new SqlServerDbUpgrader01().Upgrade(tran);
                 }
             }
 

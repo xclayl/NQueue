@@ -53,7 +53,7 @@ namespace NQueue.Internal
 
             var config = await _configFactory.GetConfig();
 
-            var conn = config.GetWorkItemDbConnection();
+            var conn = await config.GetWorkItemDbConnection();
 
             var query = await conn.Get();
             var queueState = await query.QueueHealthCheck();
@@ -103,7 +103,7 @@ namespace NQueue.Internal
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();
-            var conn = config.GetWorkItemDbConnection();
+            var conn = await config.GetWorkItemDbConnection();
 
             var query = await conn.Get();
             await query.EnqueueWorkItem(url, queueName, debugInfo, duplicatePrevention);
@@ -114,8 +114,8 @@ namespace NQueue.Internal
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();
-            var conn = config.GetWorkItemDbConnection();
-            await conn.EnqueueWorkItem(tran, config.TimeZone, url, queueName, debugInfo, duplicatePrevention);
+            var wiConn = await config.GetWorkItemDbConnection();
+            await wiConn.EnqueueWorkItem(tran, config.TimeZone, url, queueName, debugInfo, duplicatePrevention);
         }
 
 

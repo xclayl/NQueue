@@ -1,52 +1,41 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
 
-namespace NQueue.Internal.SqlServer.DbMigrations
+namespace NQueue.Internal.Db.Postgres.DbMigrations
 {
-    internal class SqlServerDbUpgrader01 : SqlServerAbstractDbUpgrader
+    internal class PostgresDbUpgrader01
     {
-        public override async ValueTask Upgrade(string cnn)
+        
+        
+        
+        public async ValueTask Upgrade(DbTransaction tran)
         {
             var sql = @"
-GO
-IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE [name] = 'NQueue') EXEC ('CREATE SCHEMA [NQueue]');
-GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE TABLE [NQueue].[CronJob](
-	[CronJobId] [int] IDENTITY(1,1) NOT NULL,
-	[Active] [bit] NOT NULL,
-	[LastRanAt] [datetimeoffset](7) NOT NULL,
-	[CronJobName] [nvarchar](50) NOT NULL,
- CONSTRAINT [PK_CronJob] PRIMARY KEY CLUSTERED 
-(
-	[CronJobId] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY],
- CONSTRAINT [AK_CronJob_CronJobName] UNIQUE NONCLUSTERED 
-(
-	[CronJobName] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY]
-GO
-CREATE TABLE [NQueue].[Queue](
-	[QueueId] [int] IDENTITY(1,1) NOT NULL,
-	[Name] [nvarchar](50) NOT NULL,
-	[NextWorkItemId] [int] NOT NULL,
-	[ErrorCount] [int] NOT NULL,
-	[LockedUntil] [datetimeoffset](7) NOT NULL,
- CONSTRAINT [PK_Queue] PRIMARY KEY CLUSTERED 
-(
-	[QueueId] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY],
- CONSTRAINT [AK_Queue_Name] UNIQUE NONCLUSTERED 
-(
-	[Name] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY]
+
+CREATE TABLE NQueue.CronJob (
+	CronJobId serial,
+	Active bit NOT NULL,
+	LastRanAt timestamp with time zone NOT NULL,
+	CronJobName varchar(50) NOT NULL,
+
+    CONSTRAINT PK_CronJob PRIMARY KEY(CronJobId),
+    CONSTRAINT AK_CronJob_CronJobName UNIQUE (CronJobName)
+);
+
+CREATE TABLE NQueue.Queue(
+	QueueId serial,
+	Name varchar(50) NOT NULL,
+	NextWorkItemId int NOT NULL,
+	ErrorCount int NOT NULL,
+	LockedUntil timestamp with time zone NOT NULL,
+    CONSTRAINT PK_Queue PRIMARY KEY (QueueId),
+    CONSTRAINT AK_Queue_Name UNIQUE (Name)
+);
+
+
 GO
 CREATE UNIQUE NONCLUSTERED INDEX [IX_NQueue_Queue_LockedUntil_NextWorkItemId]
 ON [NQueue].[Queue] ([LockedUntil],[NextWorkItemId],[QueueId])
@@ -461,26 +450,18 @@ END
             
             
             
-            var batches = SplitIntoBatches(sql);
 
-            await using var conn = new SqlConnection(cnn);
-            await conn.OpenAsync();
-            await using var tran = await conn.BeginTransactionAsync();
-
-            foreach (var batch in batches)
-            {
-	            await SqlServerAbstractWorkItemDb.ExecuteNonQuery(tran, batch);
-            }
+	        await AbstractWorkItemDb.ExecuteNonQuery(tran, sql);
+            
 
 
             await tran.CommitAsync();
 
         }
 
-
         
         
-        public bool IsMyVersion(IReadOnlyList<SqlServerSchemaInfo> dbObjects)
+        public bool IsMyVersion(IReadOnlyList<PostgresSchemaInfo> dbObjects)
         {
             var expectedTables = new[]
             {
@@ -490,15 +471,16 @@ END
                 "WorkItemCompleted",
             };
 
-            var expectedSps = new[]
-            {
-                "CompleteWorkItem",
-                "EnqueueWorkItem",
-                "FailWorkItem",
-                "NextWorkItem",
-                "PurgeWorkItems",
-                "ReplayWorkItem",
-            };
+            var expectedSps = Array.Empty<string>();
+            //     new[]
+            // {
+            //     "CompleteWorkItem",
+            //     "EnqueueWorkItem",
+            //     "FailWorkItem",
+            //     "NextWorkItem",
+            //     "PurgeWorkItems",
+            //     "ReplayWorkItem",
+            // };
 
 
             if (expectedTables.Any(t => !dbObjects.Any(d => d.Type == "table" && d.Name == t)))

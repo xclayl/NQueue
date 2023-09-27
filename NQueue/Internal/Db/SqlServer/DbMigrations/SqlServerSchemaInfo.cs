@@ -1,4 +1,4 @@
-﻿namespace NQueue.Internal.SqlServer.DbMigrations
+﻿namespace NQueue.Internal.Db.SqlServer.DbMigrations
 {
     internal class SqlServerSchemaInfo
     {   

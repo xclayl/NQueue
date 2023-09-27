@@ -1,14 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Threading.Tasks;
 
-namespace NQueue.Internal.SqlServer.DbMigrations
+namespace NQueue.Internal.Db.SqlServer.DbMigrations
 {
     internal abstract class SqlServerAbstractDbUpgrader
     {
-        public abstract ValueTask Upgrade(string cnn);
-
 
         /// <summary>
         /// This method requires each "GO" to be the only characters on the line.  

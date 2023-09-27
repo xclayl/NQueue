@@ -39,7 +39,7 @@ namespace NQueue.Internal
                 {
                     var config = await _configFactory.GetConfig();
 
-                    var conn = config.GetWorkItemDbConnection();
+                    var conn = await config.GetWorkItemDbConnection();
 
                     while (!stoppingToken.IsCancellationRequested)
                     {

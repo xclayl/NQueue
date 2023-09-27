@@ -35,7 +35,7 @@ namespace NQueue
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();
-            var conn = config.GetWorkItemDbConnection();
+            var conn = await config.GetWorkItemDbConnection();
             
             var query = await conn.Get();
 
@@ -47,8 +47,8 @@ namespace NQueue
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();
-            var conn = config.GetWorkItemDbConnection();
-            await conn.EnqueueWorkItem(tran, config.TimeZone, url, queueName, debugInfo, duplicatePrevention);
+            var wiConn = await config.GetWorkItemDbConnection();
+            await wiConn.EnqueueWorkItem(tran, config.TimeZone, url, queueName, debugInfo, duplicatePrevention);
         }
 
     }

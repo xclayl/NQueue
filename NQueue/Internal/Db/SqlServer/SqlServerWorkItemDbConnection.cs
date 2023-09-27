@@ -2,30 +2,28 @@
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
-using NQueue.Internal.SqlServer.DbMigrations;
+using NQueue.Internal.Db.SqlServer.DbMigrations;
 
-namespace NQueue.Internal.SqlServer
+namespace NQueue.Internal.Db.SqlServer
 {
 
 
 
     internal class SqlServerWorkItemDbConnection : IWorkItemDbConnection
     {
-        private readonly string _cnn;
-        private readonly TimeZoneInfo _tz;
+        private readonly NQueueServiceConfig _config;
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
         private volatile bool _dbMigrationRan = false;
 
         internal SqlServerWorkItemDbConnection(NQueueServiceConfig config)
         {
-            _cnn = config.CheckedConnectionString;
-            _tz = config.TimeZone;
+            _config = config;
         }
 
         public async ValueTask<IWorkItemDbQuery> Get()
         {
             await EnsureDbMigrationRuns();
-            return new SqlServerWorkItemDbQuery(_cnn, _tz);
+            return new SqlServerWorkItemDbQuery(_config);
         }
 
         private async ValueTask EnsureDbMigrationRuns()
@@ -37,7 +35,8 @@ namespace NQueue.Internal.SqlServer
                 {
                     if (!_dbMigrationRan)
                     {
-                        await SqlServerDbMigrator.UpdateDbSchema(_cnn);
+                        await using var conn = await _config.OpenDbConnection();
+                        await SqlServerDbMigrator.UpdateDbSchema(conn);
 
                         _dbMigrationRan = true;
                     }
