@@ -47,13 +47,17 @@ namespace NQueue.Internal.Db.Postgres
             await ExecuteNonQuery(
                 _tran, 
                 "LOCK TABLE NQueue.CronJob IN SHARE ROW EXCLUSIVE MODE;"
+            );  
+            
+            await ExecuteNonQuery(
+                _tran, 
+                "INSERT INTO NQueue.CronJob (CronJobName, LastRanAt, Active) VALUES ($1,'2000-01-01'::timestamp,TRUE) ON CONFLICT (CronJobName) DO NOTHING;",
+                SqlParameter(name)
             );
 
             var rows = ExecuteReader(
                 _tran, 
-                @"INSERT INTO NQueue.CronJob (CronJobName, LastRanAt, Active) VALUES ($1,'2000-01-01'::timestamp,TRUE)
-                        ON CONFLICT (AK_CronJob_CronJobName) DO NOTHING;
-                    SELECT cj.CronJobId FROM NQueue.CronJob cj WHERE cj.CronJobName = $1",
+                @"SELECT cj.CronJobId FROM NQueue.CronJob cj WHERE cj.CronJobName = $1",
                 reader => reader.GetInt32(0),
                 SqlParameter(name)
             );
@@ -83,7 +87,7 @@ namespace NQueue.Internal.Db.Postgres
         {
             await ExecuteNonQuery(
                 _tran,
-                "UPDATE cj SET LastRanAt = $2 FROM NQueue.CronJob cj WHERE CronJobId=$1",
+                "UPDATE NQueue.CronJob cj SET LastRanAt = $2 WHERE CronJobId=$1",
                 SqlParameter(cronJobId),
                 SqlParameter(NowUtc)
             );

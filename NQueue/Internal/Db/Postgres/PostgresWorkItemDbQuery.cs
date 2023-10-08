@@ -131,7 +131,7 @@ namespace NQueue.Internal.Db.Postgres
                 SqlParameter(url.ToString()),
                 SqlParameter(queueName),
                 SqlParameter(debugInfo),
-                SqlParameter(NowIn(tz)),
+                SqlParameter(NowIn(TimeZoneInfo.Utc)),
                 SqlParameter(duplicateProtection)
             );
         }

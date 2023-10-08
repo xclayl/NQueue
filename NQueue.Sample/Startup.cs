@@ -48,6 +48,11 @@ namespace NQueue.Sample
 
                 var dataSource = NpgsqlDataSource.Create("User Id=nqueueuser;Password=ihSH3jqeVb7giIgOkohX;Server=localhost;Port=15532;Database=NQueueSample;SslMode=Disable;");
                 config.CreateDbConnection = async () => await dataSource.OpenConnectionAsync();
+
+                config.CronJobs = new[]
+                {
+                    new NQueueCronJob("my-cron", "*/5 * * * *", "http://localhost:5000/api/NQueue/ErrorOp", "my-queue")
+                };
                 
                 return default;
             });
