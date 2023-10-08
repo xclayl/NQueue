@@ -26,59 +26,21 @@ namespace NQueue.Internal.Db
             }
         }
 
-        internal static Func<DbCommand, DbParameter> SqlParameter(string name, string? val)
-        {
-            return (cmd) =>
-            {
-                var p = cmd.CreateParameter(); // new SqlParameter(name, SqlDbType.NVarChar, val?.Length ?? 1);
-                p.ParameterName = name;
-                p.DbType = DbType.String;
-                p.Value = val ?? (object)DBNull.Value;
-                return p;
-            };
-        }
-
-        internal static Func<DbCommand, DbParameter> SqlParameter(string name, DateTimeOffset val)
-        {
-            return (cmd) =>
-            {
-                var p = cmd.CreateParameter(); // new SqlParameter(name, SqlDbType.DateTimeOffset);
-                p.ParameterName = name;
-                p.DbType = DbType.DateTimeOffset;
-                p.Value = val;
-                return p;
-            };
-        }
-
-        internal static Func<DbCommand, DbParameter> SqlParameter(string name, int val)
-        {
-            return (cmd) =>
-            {
-                var p = cmd.CreateParameter(); // new SqlParameter(name, SqlDbType.Int);
-                p.ParameterName = name;
-                p.DbType = DbType.Int32;
-                p.Value = val;
-                return p;
-            };
-        }
-
-        internal static Func<DbCommand, DbParameter> SqlParameter(string name, bool val)
-        {
-            return (cmd) =>
-            {
-                var p = cmd.CreateParameter(); // new SqlParameter(name, SqlDbType.Bit);
-                p.ParameterName = name;
-                p.DbType = DbType.Boolean;
-                p.Value = val;
-                return p;
-            };
-        }
         
         
-        public static async ValueTask ExecuteNonQuery(string sql, DbConnection conn, params Func<DbCommand, DbParameter>[] ps)
+        protected static async ValueTask ExecuteNonQuery(string sql, DbConnection conn, params Func<DbCommand, DbParameter>[] ps)
         {
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = sql;
+            cmd.Parameters.AddRange(ps.Select(p => p(cmd)).ToArray());
+            await cmd.ExecuteNonQueryAsync();
+        }
+        
+        protected static async ValueTask ExecuteProcedure(string procedure, DbConnection conn, params Func<DbCommand, DbParameter>[] ps)
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.CommandText = procedure;
             cmd.Parameters.AddRange(ps.Select(p => p(cmd)).ToArray());
             await cmd.ExecuteNonQueryAsync();
         }
@@ -98,6 +60,16 @@ namespace NQueue.Internal.Db
         {
             await using var cmd = tran.Connection.CreateCommand();
             cmd.CommandText = sql;
+            cmd.Transaction = tran;
+            cmd.Parameters.AddRange(ps.Select(p => p(cmd)).ToArray());
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        public static async ValueTask ExecuteProcedure(DbTransaction tran, string procedure, params Func<DbCommand, DbParameter>[] ps)
+        {
+            await using var cmd = tran.Connection.CreateCommand();
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.CommandText = procedure;
             cmd.Transaction = tran;
             cmd.Parameters.AddRange(ps.Select(p => p(cmd)).ToArray());
             await cmd.ExecuteNonQueryAsync();

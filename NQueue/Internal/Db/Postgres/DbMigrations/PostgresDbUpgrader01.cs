@@ -15,9 +15,10 @@ namespace NQueue.Internal.Db.Postgres.DbMigrations
         {
             var sql = @"
 
-CREATE TABLE NQueue.CronJob (
+
+CREATE TABLE IF NOT EXISTS NQueue.CronJob (
 	CronJobId serial,
-	Active bit NOT NULL,
+	Active boolean NOT NULL,
 	LastRanAt timestamp with time zone NOT NULL,
 	CronJobName varchar(50) NOT NULL,
 
@@ -25,7 +26,7 @@ CREATE TABLE NQueue.CronJob (
     CONSTRAINT AK_CronJob_CronJobName UNIQUE (CronJobName)
 );
 
-CREATE TABLE NQueue.Queue(
+CREATE TABLE IF NOT EXISTS NQueue.Queue(
 	QueueId serial,
 	Name varchar(50) NOT NULL,
 	NextWorkItemId int NOT NULL,
@@ -36,415 +37,368 @@ CREATE TABLE NQueue.Queue(
 );
 
 
-GO
-CREATE UNIQUE NONCLUSTERED INDEX [IX_NQueue_Queue_LockedUntil_NextWorkItemId]
-ON [NQueue].[Queue] ([LockedUntil],[NextWorkItemId],[QueueId])
-INCLUDE (ErrorCount)
-GO
-CREATE TABLE [NQueue].[WorkItem](
-	[WorkItemId] [int] IDENTITY(1,1) NOT NULL,
-	[IsIngested] [bit] NOT NULL,
-	[Url] [nvarchar](max) NOT NULL,
-	[DebugInfo] [nvarchar](max) NULL,
-	[CreatedAt] [datetimeoffset](7) NOT NULL,
-	[LastAttemptedAt] [datetimeoffset](7) NULL,
-	[QueueName] [nvarchar](50) NOT NULL,
- CONSTRAINT [PK_WorkItem] PRIMARY KEY CLUSTERED 
-(
-	[WorkItemId] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
-GO
-CREATE UNIQUE NONCLUSTERED INDEX [IX_NQueue_WorkItem_IsIngested_QueueName]
-ON [NQueue].[WorkItem] ([IsIngested], [QueueName], WorkItemId)
-INCLUDE (CreatedAt)
-GO
-CREATE TABLE [NQueue].[WorkItemCompleted](
-	[WorkItemId] [int] NOT NULL,
-	[Url] [nvarchar](2000) NOT NULL,
-	[DebugInfo] [nvarchar](1000) NULL,
-	[CreatedAt] [datetimeoffset](7) NOT NULL,
-	[LastAttemptedAt] [datetimeoffset](7) NULL,
-	[CompletedAt] [datetimeoffset](7) NOT NULL,
-	[QueueName] [nvarchar](50) NOT NULL,
- CONSTRAINT [PK_WorkItemCompleted] PRIMARY KEY CLUSTERED 
-(
-	[WorkItemId] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY]
-GO
-CREATE UNIQUE NONCLUSTERED INDEX [IX_NQueue_WorkItemCompleted_IsIngested_QueueName]
-ON [NQueue].[WorkItemCompleted] ([CompletedAt])
-GO
-ALTER TABLE [NQueue].[Queue]  WITH CHECK ADD  CONSTRAINT [FK_Queue_WorkItem_NextWorkItemId] FOREIGN KEY([NextWorkItemId])
-REFERENCES [NQueue].[WorkItem] ([WorkItemId])
-GO
-ALTER TABLE [NQueue].[Queue] CHECK CONSTRAINT [FK_Queue_WorkItem_NextWorkItemId]
-GO
-CREATE OR ALTER PROCEDURE [NQueue].[CompleteWorkItem]
-	@WorkItemID INT,
-	@Now datetimeoffset(7) = NULL
-AS
-BEGIN
+CREATE UNIQUE INDEX IF NOT EXISTS IX_NQueue_Queue_LockedUntil_NextWorkItemId
+ON NQueue.Queue (LockedUntil,NextWorkItemId,QueueId)
+INCLUDE (ErrorCount);
 
 
-	IF @Now IS NULL
-	BEGIN;
-		SET @Now = SYSDATETIMEOFFSET();
-	END;
-
-    IF @@TRANCOUNT != 0
-	BEGIN;
-		THROW 51000, 'Please do not run this in a transaction.', 1;   
-	END;
-	
-	BEGIN TRAN;
-	BEGIN TRY;
-		
-		
-		DECLARE @LockResult int;  
-		EXEC @LockResult = sp_getapplock @Resource = 'NQueue-work-items', @LockMode = 'Exclusive', @LockTimeout=10000;
-		IF @LockResult < 0
-		BEGIN;
-			THROW 51000, 'Lock not granted.', 1;   
-		END;
+CREATE TABLE IF NOT EXISTS NQueue.WorkItem(
+	WorkItemId serial,
+	IsIngested boolean NOT NULL,
+	Url text NOT NULL,
+	DebugInfo text NULL,
+	CreatedAt timestamp with time zone NOT NULL,
+	LastAttemptedAt timestamp with time zone NULL,
+	QueueName varchar(50) NOT NULL,
+	CONSTRAINT PK_WorkItem PRIMARY KEY (WorkItemId)
+);
 
 
-	
-		DECLARE @QueueName NVARCHAR(50);
-
-		SELECT @QueueName = QueueName
-		FROM [NQueue].WorkItem wi
-		WHERE wi.WorkItemId = @WorkItemID;
-
-		
-
-		
-		IF @QueueName IS NOT NULL
-		BEGIN;			
-		
-			DECLARE @NextWorkItemID INT;
-			DECLARE @NextCreatedAt DATETIMEOFFSET;
-			
-			SELECT TOP 1 @NextWorkItemID = WorkItemID, @NextCreatedAt = wi.CreatedAt
-			FROM [NQueue].WorkItem wi
-			WHERE
-				wi.QueueName = @QueueName
-				AND wi.WorkItemId != @WorkItemID
-				AND wi.IsIngested = 1
-			ORDER BY wi.WorkItemId
-			
-	
-			IF @NextWorkItemID IS NULL
-			BEGIN;
-				DELETE q 
-				FROM [NQueue].[Queue] q
-				WHERE q.[Name] = @QueueName;
-			END;
-			ELSE
-			BEGIN;
-				UPDATE q
-				SET LockedUntil = @NextCreatedAt,
-					NextWorkItemId = @NextWorkItemID,
-					ErrorCount = 0
-				FROM [NQueue].[Queue] q 
-				WHERE q.[Name] = @QueueName
-			END;
-		END;
-
-		
-		
-		INSERT INTO [NQueue].[WorkItemCompleted]
-				   ([WorkItemId]
-				   ,[Url]
-				   ,[DebugInfo]
-				   ,[CreatedAt]
-				   ,[LastAttemptedAt]
-				   ,[QueueName]
-				   ,[CompletedAt])
-		SELECT * FROM (
-			 DELETE FROM [NQueue].WorkItem
-			 OUTPUT
-				deleted.WorkItemId,
-				deleted.[Url],
-				deleted.[DebugInfo],
-				deleted.[CreatedAt],
-				deleted.[LastAttemptedAt],
-				deleted.[QueueName],
-				@Now AS [CompletedAt]
-			WHERE WorkItemId = @WorkItemID) a
+CREATE UNIQUE INDEX IF NOT EXISTS IX_NQueue_WorkItem_IsIngested_QueueName
+ON NQueue.WorkItem (IsIngested, QueueName, WorkItemId)
+INCLUDE (CreatedAt);
 
 
-		
-		COMMIT TRAN;
-      
-	END TRY
-	BEGIN CATCH    
-		DECLARE 
-			@ErrorMessage  NVARCHAR(4000), 
-			@ErrorSeverity INT, 
-			@ErrorState    INT, 
-			@ErrorLine    INT;
-			
-		SELECT 
-			@ErrorMessage = ERROR_MESSAGE(), 
-			@ErrorSeverity = ERROR_SEVERITY(), 
-			@ErrorState = ERROR_STATE(),
-			@ErrorLine = ERROR_LINE();
+CREATE TABLE IF NOT EXISTS NQueue.WorkItemCompleted(
+	WorkItemId int NOT NULL,
+	Url varchar(2000) NOT NULL,
+	DebugInfo varchar(1000) NULL,
+	CreatedAt timestamp with time zone NOT NULL,
+	LastAttemptedAt timestamp with time zone NULL,
+	CompletedAt timestamp with time zone NOT NULL,
+	QueueName varchar(50) NOT NULL,
+	CONSTRAINT PK_WorkItemCompleted PRIMARY KEY (WorkItemId)
+);
 
-		SET @ErrorMessage = @ErrorMessage + ' line ' + CAST(@ErrorLine AS varchar(20));
 
-		ROLLBACK TRAN;
+CREATE UNIQUE INDEX IF NOT EXISTS IX_NQueue_WorkItemCompleted_IsIngested_QueueName
+ON NQueue.WorkItemCompleted (CompletedAt);
 
-		-- return the error inside the CATCH block
-		RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState); 
-	END CATCH;  
-	  
-END;	    
-GO
-CREATE OR ALTER PROCEDURE [NQueue].[EnqueueWorkItem]
-	@Url nvarchar(1000),
-	@QueueName nvarchar(50) = NULL,
-	@DebugInfo nvarchar(1000) = NULL,
-	@Now datetimeoffset(7) = NULL,
-	@DuplicateProtection BIT = NULL
-AS
-BEGIN
-	IF @Now IS NULL
-	BEGIN;
-		SET @Now = SYSDATETIMEOFFSET();
-	END;
+
+ALTER TABLE NQueue.Queue DROP CONSTRAINT IF EXISTS FK_Queue_WorkItem_NextWorkItemId;
+ALTER TABLE NQueue.Queue ADD CONSTRAINT FK_Queue_WorkItem_NextWorkItemId FOREIGN KEY(NextWorkItemId)
+REFERENCES NQueue.WorkItem (WorkItemId);
+
+
+
+
+CREATE OR REPLACE PROCEDURE NQueue.CompleteWorkItem(
+	pWorkItemID NQueue.WorkItem.WorkItemId%TYPE,
+	pNow timestamp with time zone = NULL
+)
+language plpgsql
+as $$
+declare
+    vQueueName NQueue.WorkItem.QueueName%TYPE;
+	vNextWorkItemID NQueue.WorkItem.WorkItemId%TYPE;
+    vNextCreatedAt NQueue.WorkItem.CreatedAt%TYPE;
+begin
+
+
+	IF pNow IS NULL THEN
+		pNow := CURRENT_TIMESTAMP;
+	END IF;
+
+
+    PERFORM pg_advisory_xact_lock(-5839653868952364629);
+
+
+    SELECT wi.QueueName
+    INTO   vQueueName
+    FROM NQueue.WorkItem wi
+    WHERE wi.WorkItemId = pWorkItemID;
+
+
+    IF vQueueName IS NOT NULL THEN
+
+
+        SELECT WorkItemID,    wi.CreatedAt
+        INTO vNextWorkItemID, vNextCreatedAt
+        FROM NQueue.WorkItem wi
+        WHERE
+            wi.QueueName = vQueueName
+            AND wi.WorkItemId != pWorkItemID
+            AND wi.IsIngested = TRUE
+        ORDER BY wi.WorkItemId
+        LIMIT 1;
+
+
+        IF vNextWorkItemID IS NULL THEN
+            DELETE FROM NQueue.Queue q
+            WHERE q.Name = vQueueName;
+        ELSE
+            UPDATE NQueue.Queue q
+            SET LockedUntil = vNextCreatedAt,
+                NextWorkItemId = vNextWorkItemID,
+                ErrorCount = 0
+            WHERE q.Name = vQueueName;
+        END IF;
+    END IF;
+
+
+    WITH del_cte AS (
+        DELETE FROM NQueue.WorkItem
+        WHERE WorkItemId = pWorkItemID
+        RETURNING
+            WorkItemId,
+            Url,
+            DebugInfo,
+            CreatedAt,
+            LastAttemptedAt,
+            QueueName,
+            pNow AS CompletedAt
+    )
+    INSERT INTO NQueue.WorkItemCompleted
+               (WorkItemId
+               ,Url
+               ,DebugInfo
+               ,CreatedAt
+               ,LastAttemptedAt
+               ,QueueName
+               ,CompletedAt)
+    SELECT * FROM del_cte a;
+
+end; $$;
+
+
+
+
+CREATE OR REPLACE PROCEDURE NQueue.EnqueueWorkItem (
+	pUrl NQueue.WorkItem.Url%TYPE,
+	pQueueName NQueue.WorkItem.QueueName%TYPE default NULL,
+	pDebugInfo NQueue.WorkItem.DebugInfo%TYPE default NULL,
+	pNow timestamp with time zone default NULL,
+	pDuplicateProtection boolean default NULL
+)
+language plpgsql
+as $$
+declare
+	vDupeWorkItemID NQueue.WorkItem.WorkItemID%TYPE;
+	vDupeWorkItemID2 NQueue.WorkItem.WorkItemID%TYPE;
+	vDupeLastAttemptedAt NQueue.WorkItem.LastAttemptedAt%TYPE;
+begin
+	IF pNow IS NULL THEN
+		pNow := CURRENT_TIMESTAMP;
+	END IF;
 
 	-- DECLARE @Now datetimeoffset(7) = sysdatetimeoffset() AT TIME ZONE 'GMT Standard Time';
 	-- select * from sys.time_zone_info
-	
-	IF @QueueName IS NULL
-	BEGIN;
-		SET @QueueName = CONVERT(varchar(255),NEWID());
-	END;
 
-	IF @DuplicateProtection IS NULL
-	BEGIN;
-		SET @DuplicateProtection = 0;
-	END;
+	IF pQueueName IS NULL THEN
+		pQueueName := gen_random_uuid()::text;
+	END IF;
 
-	IF @DuplicateProtection = 1
-	BEGIN;
-		DECLARE @DupeWorkItemID INT;
+	IF pDuplicateProtection IS NULL THEN
+		pDuplicateProtection := FALSE;
+	END IF;
 
-		SELECT TOP 1 @DupeWorkItemID = wi.WorkItemId
-		FROM [NQueue].WorkItem wi 
+	IF pDuplicateProtection = TRUE THEN
+
+		SELECT wi.WorkItemId
+		INTO   vDupeWorkItemID
+		FROM NQueue.WorkItem wi
 		WHERE
 				wi.LastAttemptedAt IS NULL
-				AND wi.QueueName = @QueueName
-				AND wi.[Url] = @Url;
+				AND wi.QueueName = pQueueName
+				AND wi.Url = pUrl
+		LIMIT 1;
 
-		IF @DupeWorkItemID IS NOT NULL
-		BEGIN;
-			DECLARE @DupeWorkItemID2 INT;
-			DECLARE @DupeLastAttemptedAt DATETIMEOFFSET;
+		IF vDupeWorkItemID IS NOT NULL THEN
 
-			SELECT @DupeWorkItemID2 = wi.WorkItemID, @DupeLastAttemptedAt = LastAttemptedAt
-			FROM [NQueue].WorkItem wi WITH (REPEATABLEREAD) -- [NQueue].[NextWorkItem] won't be allowed to take this record until the transaction completes
-			WHERE wi.WorkItemId = @DupeWorkItemID
+			SELECT wi.WorkItemID,    LastAttemptedAt
+			INTO   vDupeWorkItemID2, vDupeLastAttemptedAt
+			FROM NQueue.WorkItem wi -- WITH (REPEATABLEREAD) -- [NQueue].[NextWorkItem] won't be allowed to take this record until the transaction completes
+			WHERE wi.WorkItemId = vDupeWorkItemID
+			FOR UPDATE;
 
-			IF @DupeWorkItemID2 IS NOT NULL AND @DupeLastAttemptedAt IS NULL
-			BEGIN;			
+			IF vDupeWorkItemID2 IS NOT NULL AND vDupeLastAttemptedAt IS NULL THEN
 				RETURN;
-			END
+			END IF;
 
-		END;
+		END IF;
 
-	END;
+	END IF;
 
 
-	INSERT INTO [NQueue].WorkItem ([Url], DebugInfo, CreatedAt, QueueName, IsIngested)
-	VALUES (@Url, @DebugInfo, @Now, @QueueName, 0)
+	INSERT INTO NQueue.WorkItem (Url, DebugInfo, CreatedAt, QueueName, IsIngested)
+	VALUES (pUrl, pDebugInfo, pNow, pQueueName, FALSE);
 
-END	    
-GO
-CREATE OR ALTER PROCEDURE [NQueue].[FailWorkItem]
-	@WorkItemID INT,
-	@Now datetimeoffset(7) = NULL
-AS
-BEGIN
+END; $$;
 
-	IF @Now IS NULL
-	BEGIN;
-		SET @Now = SYSDATETIMEOFFSET();
-	END;
-	
-	UPDATE q
-	SET ErrorCount = q.ErrorCount + 1, LockedUntil = DATEADD(minute, 5, @Now)
-	FROM [NQueue].WorkItem r
-	JOiN [NQueue].[Queue] q ON r.QueueName = q.[Name]
-	WHERE r.WorkItemId = @WorkItemID;
 
-END	    
-GO
-CREATE OR ALTER PROCEDURE [NQueue].[NextWorkItem]
-	@Now datetimeoffset(7) = NULL
-AS
-BEGIN
 
-	IF @Now IS NULL
-	BEGIN;
-		SET @Now = SYSDATETIMEOFFSET();
-	END;
+
+
+
+CREATE OR REPLACE PROCEDURE NQueue.FailWorkItem (
+	pWorkItemID NQueue.WorkItem.WorkItemID%TYPE,
+	pNow timestamp with time zone = NULL
+)
+language plpgsql
+as $$
+declare
+
+begin
+
+	IF pNow IS NULL THEN
+		pNow := CURRENT_TIMESTAMP;
+	END IF;
+
+	UPDATE NQueue.Queue q
+	SET ErrorCount = q.ErrorCount + 1, LockedUntil = pNow + interval '5 minutes'
+	FROM NQueue.WorkItem r
+	WHERE r.QueueName = q.Name
+        AND r.WorkItemId = pWorkItemID;
+
+end; $$;
+
+
+
+
+CREATE OR REPLACE FUNCTION NQueue.NextWorkItem (
+	pNow timestamp with time zone = NULL
+) RETURNS TABLE(WorkItemId NQueue.WorkItem.WorkItemID%TYPE, Url NQueue.WorkItem.Url%TYPE)
+as $$
+declare
+	vQueueID NQueue.WorkItem.WorkItemID%TYPE;
+	vWorkItemID NQueue.Queue.QueueID%TYPE;
+
+begin
+
+	IF pNow IS NULL THEN
+		pNow := CURRENT_TIMESTAMP;
+	END IF;
 
 	-- SET NOCOUNT ON added to prevent extra result sets from
 	-- interfering with SELECT statements.
-	SET NOCOUNT ON;
-
-    IF @@TRANCOUNT != 0
-	BEGIN;
-		THROW 51000, 'Please do not run this in a transaction.', 1;   
-	END;
+	-- SET NOCOUNT ON;
 
 
-	BEGIN TRAN;
-	BEGIN TRY
-		
-		DECLARE @LockResult int;  
-		EXEC @LockResult = sp_getapplock @Resource = 'NQueue-work-items', @LockMode = 'Exclusive', @LockTimeout=10000;
-		IF @LockResult < 0
-		BEGIN;
-			THROW 51000, 'Lock not granted.', 1;   
-		END;
+    PERFORM pg_advisory_xact_lock(-5839653868952364629);
 
-		-- import work items
+	-- import work items
 
-		WITH cte AS (			
-			SELECT 
-				wi.WorkItemId, 
-				wi.QueueName, 
-				wi.CreatedAt, 
-				ROW_NUMBER() OVER (Partition By wi.QueueName ORDER BY wi.WorkItemId) AS RN
-			FROM [NQueue].WorkItem wi
-			WHERE
-				wi.IsIngested = 0
-		)
-		INSERT INTO [NQueue].[Queue] ([Name], NextWorkItemId, ErrorCount, LockedUntil)
-		SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt
-		FROM cte
-		WHERE RN = 1
-		AND cte.QueueName NOT IN (
-			SELECT q.[Name] FROM [NQueue].[Queue] q
-		);
-		
-		
-		UPDATE wi
-		SET IsIngested = 1
-		FROM	
-			[NQueue].WorkItem wi
-		JOIN
-			[NQueue].[Queue] q ON wi.QueueName = q.[Name]
+	WITH cte AS (
+		SELECT
+			wi.WorkItemId,
+			wi.QueueName,
+			wi.CreatedAt,
+			ROW_NUMBER() OVER (Partition By wi.QueueName ORDER BY wi.WorkItemId) AS RN
+		FROM NQueue.WorkItem wi
 		WHERE
-			wi.IsIngested = 0;
+			wi.IsIngested = FALSE
+	)
+	INSERT INTO NQueue.Queue (Name, NextWorkItemId, ErrorCount, LockedUntil)
+	SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt
+	FROM cte
+	WHERE RN = 1
+	AND cte.QueueName NOT IN (
+		SELECT q.Name FROM NQueue.Queue q
+	);
+
+
+	UPDATE NQueue.WorkItem wi
+	SET IsIngested = TRUE
+	FROM
+		NQueue.Queue q
+	WHERE wi.QueueName = q.Name
+		AND wi.IsIngested = FALSE;
 
 
 
-		-- take work item
-
-		DECLARE @QueueID INT;
-		DECLARE @WorkItemID INT;
-
-		SELECT TOP 1
-			@QueueID = q.QueueId,
-			@WorkItemID = q.NextWorkItemId
-		FROM
-			[NQueue].[Queue] q
-		WHERE
-			q.LockedUntil < @Now
-			AND q.ErrorCount < 5
-		ORDER BY
-			q.LockedUntil, q.NextWorkItemId;
-			
+	-- take work item
 
 
-		IF @WorkItemID IS NOT NULL
-		BEGIN;			
-			UPDATE ur 
-			SET LastAttemptedAt = @Now
-			FROM [NQueue].WorkItem ur
-			WHERE ur.WorkItemId = @WorkItemID;
-				
-			UPDATE ur 
-			SET LockedUntil = DATEADD(hour, 1, @Now)
-			FROM [NQueue].[Queue] ur
-			WHERE ur.QueueId = @QueueID;
-		END;
+	SELECT q.QueueId, q.NextWorkItemId
+	INTO   vQueueID,  vWorkItemID
+	FROM
+		NQueue.Queue q
+	WHERE
+		q.LockedUntil < pNow
+		AND q.ErrorCount < 5
+	ORDER BY
+		q.LockedUntil, q.NextWorkItemId
+	LIMIT 1;
 
-		SELECT r.WorkItemId, r.[Url]
-			FROM [NQueue].WorkItem r	
-			WHERE r.WorkItemId = @WorkItemID;
 
-		COMMIT TRAN;
-	END TRY 
-	BEGIN CATCH    
-		DECLARE 
-			@ErrorMessage  NVARCHAR(4000), 
-			@ErrorSeverity INT, 
-			@ErrorState    INT, 
-			@ErrorLine    INT;
-			
-		SELECT 
-			@ErrorMessage = ERROR_MESSAGE(), 
-			@ErrorSeverity = ERROR_SEVERITY(), 
-			@ErrorState = ERROR_STATE(),
-			@ErrorLine = ERROR_LINE();
 
-		SET @ErrorMessage = @ErrorMessage + ' line ' + CAST(@ErrorLine AS varchar(20));
+	IF vWorkItemID IS NOT NULL THEN
+		UPDATE NQueue.WorkItem ur
+		SET LastAttemptedAt = pNow
+		WHERE ur.WorkItemId = vWorkItemID;
 
-		ROLLBACK TRAN;
+		UPDATE NQueue.Queue ur
+		SET LockedUntil = pNow + interval '1 hour'
+		WHERE ur.QueueId = vQueueID;
+	END IF;
 
-		-- return the error inside the CATCH block
-		RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState); 
-	END CATCH;  
-END    
-GO
-CREATE OR ALTER PROCEDURE [NQueue].[PurgeWorkItems]
-	@Now datetimeoffset(7) = NULL
-AS
-BEGIN	
+	return query
+	SELECT r.WorkItemId, r.Url
+		FROM NQueue.WorkItem r
+		WHERE r.WorkItemId = vWorkItemID;
 
-	IF @Now IS NULL
-	BEGIN;
-		SET @Now = SYSDATETIMEOFFSET();
-	END;
 
-	DELETE TOP (1000) c 
-	FROM [NQueue].WorkItemCompleted c
-	WHERE c.CompletedAt < DATEADD(day, -14, @Now);
-END			
-GO
-CREATE OR ALTER PROCEDURE [NQueue].[ReplayWorkItem]
-	@WorkItemID INT,
-	@Now datetimeoffset(7) = NULL
-AS
-BEGIN
+end; $$ language plpgsql;
 
-	IF @Now IS NULL
-	BEGIN;
-		SET @Now = SYSDATETIMEOFFSET();
-	END;
 
-	INSERT INTO [NQueue].[WorkItem]
-           ([Url]
-			,[DebugInfo]
-			,[CreatedAt]
-			,[QueueName]
+
+
+CREATE OR REPLACE PROCEDURE NQueue.PurgeWorkItems (
+	pNow timestamp with time zone = NULL
+)
+language plpgsql
+as $$
+declare
+
+begin
+
+	IF pNow IS NULL THEN
+		pNow := CURRENT_TIMESTAMP;
+	END IF;
+
+	DELETE
+	FROM NQueue.WorkItemCompleted c
+	WHERE c.WorkItemId IN (
+	    SELECT i.WorkItemId
+	    FROM NQueue.WorkItemCompleted i
+	    WHERE i.CompletedAt < pNow - interval '14 days'
+	    LIMIT 1000
+    );
+end; $$;
+
+
+
+
+CREATE OR REPLACE PROCEDURE NQueue.ReplayWorkItem (
+	pWorkItemID NQueue.WorkItem.WorkItemID%TYPE,
+	pNow timestamp with time zone = NULL
+)
+language plpgsql
+as $$
+declare
+
+begin
+
+	IF pNow IS NULL THEN
+		pNow := CURRENT_TIMESTAMP;
+	END IF;
+
+	INSERT INTO NQueue.WorkItem
+           (Url
+			,DebugInfo
+			,CreatedAt
+			,QueueName
 			,IsIngested)
      SELECT
 		   c.Url,
 		   c.DebugInfo,
-		   @Now,
+		   pNow,
 		   c.QueueName,
-		   0
-	FROM [NQueue].WorkItemCompleted c 
-	WHERE c.WorkItemId = @WorkItemID;
+		   FALSE
+	FROM NQueue.WorkItemCompleted c
+	WHERE c.WorkItemId = pWorkItemID;
 
-END
+end; $$
 
 ";
             
@@ -465,22 +419,22 @@ END
         {
             var expectedTables = new[]
             {
-                "CronJob",
-                "Queue",
-                "WorkItem",
-                "WorkItemCompleted",
+                "cronjob",
+                "queue",
+                "workitem",
+                "workitemcompleted",
             };
 
-            var expectedSps = Array.Empty<string>();
-            //     new[]
-            // {
-            //     "CompleteWorkItem",
-            //     "EnqueueWorkItem",
-            //     "FailWorkItem",
-            //     "NextWorkItem",
-            //     "PurgeWorkItems",
-            //     "ReplayWorkItem",
-            // };
+            var expectedSps =
+	            new[]
+	            {
+		            "failworkitem",
+		            "nextworkitem",
+		            "purgeworkitems",
+		            "replayworkitem",
+		            "enqueueworkitem",
+		            "completeworkitem",
+	            };
 
 
             if (expectedTables.Any(t => !dbObjects.Any(d => d.Type == "table" && d.Name == t)))

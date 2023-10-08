@@ -1,6 +1,6 @@
 ## Getting Started
     CREATE USER NQueueUser PASSWORD 'ihSH3jqeVb7giIgOkohX';
-    CREATE SCHEMA IF NOT EXISTS  "NQueue" AUTHORIZATION NQueueUser;
+    CREATE SCHEMA IF NOT EXISTS nqueue AUTHORIZATION NQueueUser;
 
 
 

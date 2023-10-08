@@ -8,7 +8,7 @@ using NQueue.Internal.Model;
 namespace NQueue.Internal.Db.SqlServer
 {
 
-    internal class SqlServerWorkItemDbQuery : AbstractWorkItemDb, IWorkItemDbQuery
+    internal class SqlServerWorkItemDbQuery : SqlServerAbstractWorkItemDb, IWorkItemDbQuery
     {
         private readonly NQueueServiceConfig _config;
 

@@ -13,9 +13,9 @@ namespace NQueue.Internal.Db.Postgres.DbMigrations
         {
             
             await using var tran = await conn.BeginTransactionAsync();
-            await AbstractWorkItemDb.ExecuteNonQuery(tran, @"
-SELECT pg_advisory_xact_lock(26022904, 962387737);
-");
+            await AbstractWorkItemDb.ExecuteNonQuery(tran, @"do $$ BEGIN 
+PERFORM pg_advisory_xact_lock(-5839653868952364629);
+end; $$");
             
             
             var currentVersion = 0;
@@ -26,11 +26,11 @@ SELECT pg_advisory_xact_lock(26022904, 962387737);
                 var dbObjects = await AbstractWorkItemDb.ExecuteReader(
                     tran,
                     @"                   
-                    select 'schema' AS type, s.SCHEMA_NAME AS name from INFORMATION_SCHEMA.SCHEMATA s where s.SCHEMA_NAME = 'NQueue'
+                    select 'schema' AS type, s.SCHEMA_NAME AS name from INFORMATION_SCHEMA.SCHEMATA s where s.SCHEMA_NAME = 'nqueue'
                     UNION
-                    select 'table' AS type, t.TABLE_NAME FROM INFORMATION_SCHEMA.TABLES t WHERE t.TABLE_SCHEMA = 'NQueue'
+                    select 'table' AS type, t.TABLE_NAME FROM INFORMATION_SCHEMA.TABLES t WHERE t.TABLE_SCHEMA = 'nqueue'
                     UNION
-                    select 'routine' AS type, r.ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'NQueue';
+                    select 'routine' AS type, r.ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'nqueue';
                     ", 
                         reader => new PostgresSchemaInfo(
                         reader.GetString(0),
@@ -39,7 +39,7 @@ SELECT pg_advisory_xact_lock(26022904, 962387737);
                 ).ToListAsync();
 
 
-                if (dbObjects.Count == 0 || dbObjects.Count == 1 && dbObjects.Single().Type == "schema" && dbObjects.Single().Name == "NQueue")
+                if (dbObjects.Count == 0 || dbObjects.Count == 1 && dbObjects.Single().Type == "schema" && dbObjects.Single().Name == "nqueue")
                 {
                     // version "0" DB. Upgrade to version 1
 

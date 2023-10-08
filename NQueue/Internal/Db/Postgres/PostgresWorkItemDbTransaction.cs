@@ -1,23 +1,22 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace NQueue.Internal.Db.SqlServer
+namespace NQueue.Internal.Db.Postgres
 {
-
-    internal class SqlServerWorkItemDbTransaction : SqlServerAbstractWorkItemDb, IWorkItemDbTransaction
+    internal class PostgresWorkItemDbTransaction: PostgresAbstractWorkItemDb, IWorkItemDbTransaction
     {
         private readonly DbTransaction _tran;
         private readonly DbConnection _conn;
 
-        public SqlServerWorkItemDbTransaction(DbTransaction tran, DbConnection conn, TimeZoneInfo tz) : base(tz)
+        public PostgresWorkItemDbTransaction(DbTransaction tran, DbConnection conn, TimeZoneInfo tz): base(tz)
         {
             _tran = tran;
             _conn = conn;
         }
-
+        
+        
         public async ValueTask DisposeAsync()
         {
             await _tran.DisposeAsync();
@@ -31,14 +30,14 @@ namespace NQueue.Internal.Db.SqlServer
 
         public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
         {
-            await ExecuteNonQuery(
+            await ExecuteProcedure(
                 _tran, 
-                "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection",
-                SqlParameter("@QueueName", queueName),
-                SqlParameter("@Url", url.ToString()),
-                SqlParameter("@DebugInfo", debugInfo),
-                SqlParameter("@Now", Now),
-                SqlParameter("@DuplicateProtection", duplicateProtection)
+                "nqueue.EnqueueWorkItem",
+                SqlParameter(url.ToString()),
+                SqlParameter(queueName),
+                SqlParameter(debugInfo),
+                SqlParameter(NowUtc),
+                SqlParameter(duplicateProtection)
             );
         }
 
@@ -47,18 +46,16 @@ namespace NQueue.Internal.Db.SqlServer
         {
             await ExecuteNonQuery(
                 _tran, 
-                "SELECT TOP 1 * FROM [NQueue].CronJob cj WITH (UPDLOCK,HOLDLOCK,TABLOCK);"
+                "LOCK TABLE NQueue.CronJob IN SHARE ROW EXCLUSIVE MODE;"
             );
 
             var rows = ExecuteReader(
                 _tran, 
-                @"IF NOT EXISTS(SELECT * FROM [NQueue].CronJob cj WHERE cj.CronJobName = @CronJobName) 
-                    BEGIN;
-                        INSERT INTO [NQueue].CronJob ([CronJobName], [LastRanAt], [Active]) VALUES (@CronJobName,'2000-01-01',1);
-                    END;
-                    SELECT cj.CronJobId FROM [NQueue].CronJob cj WHERE cj.CronJobName = @CronJobName",
+                @"INSERT INTO NQueue.CronJob (CronJobName, LastRanAt, Active) VALUES ($1,'2000-01-01'::timestamp,TRUE)
+                        ON CONFLICT (AK_CronJob_CronJobName) DO NOTHING;
+                    SELECT cj.CronJobId FROM NQueue.CronJob cj WHERE cj.CronJobName = $1",
                 reader => reader.GetInt32(0),
-                SqlParameter("@CronJobName", name)
+                SqlParameter(name)
             );
 
             return (await rows.ToListAsync()).Single();
@@ -68,13 +65,13 @@ namespace NQueue.Internal.Db.SqlServer
         {
             var rowEnumerable = ExecuteReader(
                 _tran, 
-                "SELECT CAST(LastRanAt AT TIME ZONE 'UTC' AS DATETIME) AS LastRanAtUtc, Active FROM [NQueue].CronJob cj WITH (UPDLOCK,HOLDLOCK) WHERE CronJobId=@CronJobId",
+                "SELECT LastRanAt, Active FROM NQueue.CronJob cj WHERE CronJobId=$1 FOR UPDATE",
                 reader => new
                 {
                     LastRanAt = new DateTimeOffset(reader.GetDateTime(0), TimeSpan.Zero),
                     Active = reader.GetBoolean(1),
                 },
-                SqlParameter("@CronJobId", cronJobId)
+                SqlParameter(cronJobId)
             );
 
             var rows = await rowEnumerable.ToListAsync();
@@ -86,13 +83,11 @@ namespace NQueue.Internal.Db.SqlServer
         {
             await ExecuteNonQuery(
                 _tran,
-                "UPDATE cj SET LastRanAt = @LastRanAt FROM [NQueue].CronJob cj WHERE CronJobId=@CronJobId",
-                SqlParameter("@CronJobId", cronJobId),
-                SqlParameter("@LastRanAt", Now)
+                "UPDATE cj SET LastRanAt = $2 FROM NQueue.CronJob cj WHERE CronJobId=$1",
+                SqlParameter(cronJobId),
+                SqlParameter(NowUtc)
             );
         }
-
-
 
     }
 }
