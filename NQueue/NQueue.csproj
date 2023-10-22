@@ -2,12 +2,16 @@
 
     <PropertyGroup>
         <TargetFramework>netcoreapp3.1</TargetFramework>
-        <PackageVersion>1.0.0-beta-001</PackageVersion>
+        <PackageVersion>0.0.1-alpha-001</PackageVersion>
         <Authors>Clay Lenhart</Authors>
-        <Description>NQueue runs background code in a dotnet ASPNet Core application in a persistent way by storing the work items in SQL Server.</Description>
+        <Description>NQueue follows the Outbox pattern by persisting "work items" in your Postgres or SQL Server database with your database transactions by running in the background code of your dotnet ASPNet Core application.</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageId>NQueue</PackageId>
-        <Copyright>Copyright (c) Clay Lenhart 2022.</Copyright>
+        <Copyright>Copyright (c) Clay Lenhart 2023</Copyright>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <RepositoryUrl>https://github.com/xclayl/NQueue</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>queuing, message broker, outbox pattern, message bus</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>

@@ -292,9 +292,7 @@ begin
 	SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt
 	FROM cte
 	WHERE RN = 1
-	AND cte.QueueName NOT IN (
-		SELECT q.Name FROM NQueue.Queue q
-	);
+	ON CONFLICT (Name) DO NOTHING;
 
 
 	UPDATE NQueue.WorkItem wi
