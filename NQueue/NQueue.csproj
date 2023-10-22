@@ -4,7 +4,7 @@
         <TargetFramework>netcoreapp3.1</TargetFramework>
         <PackageVersion>0.0.1-alpha-001</PackageVersion>
         <Authors>Clay Lenhart</Authors>
-        <Description>NQueue follows the Outbox pattern by persisting "work items" in your Postgres or SQL Server database with your database transactions by running in the background code of your dotnet ASPNet Core application.</Description>
+        <Description>NQueue follows the Outbox pattern by persisting "work items" in your Postgres or SQL Server database using your database transactions by processing them in the background of your dotnet ASPNet Core application.</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageId>NQueue</PackageId>
         <Copyright>Copyright (c) Clay Lenhart 2023</Copyright>
@@ -12,6 +12,7 @@
         <RepositoryUrl>https://github.com/xclayl/NQueue</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <PackageTags>queuing, message broker, outbox pattern, message bus</PackageTags>
+        <PackageReadmeFile>readme.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -22,7 +23,8 @@
       <PackageReference Include="System.Linq.Async" Version="4.1.1" />
     </ItemGroup>
 
-
-
+    <ItemGroup>
+        <None Include="doc\readme.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
 
 </Project>

@@ -46,8 +46,15 @@ namespace NQueue.Sample
                 //     return new ValueTask<DbConnection>(new SqlConnection(cnnBuilder.ToString()));
                 // };
 
-                var dataSource = NpgsqlDataSource.Create("User Id=nqueueuser;Password=ihSH3jqeVb7giIgOkohX;Server=localhost;Port=15532;Database=NQueueSample;SslMode=Disable;");
-                config.CreateDbConnection = async () => await dataSource.OpenConnectionAsync();
+                var cnnBuilder = new NpgsqlConnectionStringBuilder()
+                {
+                    Host = "localhost",
+                    Database = "NQueueSample",
+                    Username = "nqueueuser",
+                    Password = "ihSH3jqeVb7giIgOkohX",
+                };
+                cnnBuilder.SslMode = cnnBuilder.Host == "localhost" ? SslMode.Disable : SslMode.VerifyFull;
+                config.CreateDbConnection = () => new ValueTask<DbConnection>(new NpgsqlConnection(cnnBuilder.ToString()));
 
                 config.CronJobs = new[]
                 {
