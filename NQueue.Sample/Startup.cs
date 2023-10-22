@@ -52,6 +52,7 @@ namespace NQueue.Sample
                     Database = "NQueueSample",
                     Username = "nqueueuser",
                     Password = "ihSH3jqeVb7giIgOkohX",
+                    Port = 15532
                 };
                 cnnBuilder.SslMode = cnnBuilder.Host == "localhost" ? SslMode.Disable : SslMode.VerifyFull;
                 config.CreateDbConnection = () => new ValueTask<DbConnection>(new NpgsqlConnection(cnnBuilder.ToString()));
