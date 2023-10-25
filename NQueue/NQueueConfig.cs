@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using NQueue.Internal;
 using NQueue.Internal.Db;
+using NQueue.Internal.Db.InMemory;
 using NQueue.Internal.Db.Postgres;
 using NQueue.Internal.Db.SqlServer;
 
@@ -19,17 +20,20 @@ namespace NQueue
         public int QueueRunners { get; set; } = 1;
         public TimeSpan PollInterval { get; set; } = TimeSpan.FromMinutes(5);
         public Action<HttpClient, Uri> ConfigureAuth { get; set; } = (h, u) => { };
-        public Func<ValueTask<DbConnection>> CreateDbConnection { get; set; } = null!;
+        public Func<ValueTask<DbConnection?>> CreateDbConnection { get; set; } = null!;
         public IReadOnlyList<NQueueCronJob> CronJobs = new List<NQueueCronJob>();
 
         private volatile IWorkItemDbConnection? _workItemDbConnection;
+        private readonly InMemoryWorkItemDbConnection _inMemoryWorkItemDbConnection = new InMemoryWorkItemDbConnection();
 
 
-        internal async ValueTask<DbConnection> OpenDbConnection()
+        internal async ValueTask<DbConnection?> OpenDbConnection()
         {
             if (CreateDbConnection == null)
                 throw new Exception("Please configure CreateDbConnection in AddNQueueHostedService()");
             var conn = await CreateDbConnection();
+            if (conn == null)
+                return null;
             if (conn.State != ConnectionState.Open)
                 await conn.OpenAsync();
             return conn;
@@ -47,6 +51,7 @@ namespace NQueue
             {
                 case DbServerTypes.SqlServer: return _workItemDbConnection = new SqlServerWorkItemDbConnection(this);
                 case DbServerTypes.Postgres: return _workItemDbConnection = new PostgresWorkItemDbConnection(this);
+                case DbServerTypes.InMemory: return _workItemDbConnection = _inMemoryWorkItemDbConnection;
                 default: throw new Exception($"Unknown DB Server type: {dbType}");
             }
 
@@ -55,6 +60,8 @@ namespace NQueue
         private async ValueTask<DbServerTypes> DetectServerType()
         {
             await using var conn = await OpenDbConnection();
+            if (conn == null)
+                return DbServerTypes.InMemory;
             // Console.WriteLine(conn.ServerVersion);
             // 16.00.5100 for SQL Server
             // 16.0 for Postgres
@@ -150,6 +157,7 @@ namespace NQueue
         {
             SqlServer,
             Postgres,
+            InMemory
         }
 
     }

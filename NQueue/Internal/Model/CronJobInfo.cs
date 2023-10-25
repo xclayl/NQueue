@@ -11,7 +11,7 @@ namespace NQueue.Internal.Model
             LastRanAt = lastRanAt;
         }
 
-        public int CronJobId { get;  }
+        public int CronJobId { get; }
         public string CronJobName { get; }
         public DateTimeOffset LastRanAt { get; }
 
