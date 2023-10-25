@@ -44,9 +44,11 @@ namespace NQueue.Internal.Workers
             {
                 using var httpClient = _httpClientFactory.CreateClient();
 
-                var url = new Uri(request.Url);
-                _config.ConfigureAuth(httpClient, url);
-                using var resp = await httpClient.GetAsync(url);
+                using var httpReq = new HttpRequestMessage();
+                httpReq.RequestUri = new Uri(request.Url);
+                httpReq.Method = HttpMethod.Get;
+                await _config.ModifyHttpRequest(httpReq);
+                using var resp = await httpClient.SendAsync(httpReq);
 
                 if (resp.IsSuccessStatusCode)
                 {

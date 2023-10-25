@@ -5,6 +5,7 @@ using System.Data.Common;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Windows.Markup;
 using NQueue.Internal;
 using NQueue.Internal.Db;
 using NQueue.Internal.Db.InMemory;
@@ -19,7 +20,7 @@ namespace NQueue
         // public bool RunWorkers { get; set; } = true;
         public int QueueRunners { get; set; } = 1;
         public TimeSpan PollInterval { get; set; } = TimeSpan.FromMinutes(5);
-        public Action<HttpClient, Uri> ConfigureAuth { get; set; } = (h, u) => { };
+        public Func<HttpRequestMessage, ValueTask> ModifyHttpRequest { get; set; } = async (r) => { };
         public Func<ValueTask<DbConnection?>> CreateDbConnection { get; set; } = null!;
         public IReadOnlyList<NQueueCronJob> CronJobs = new List<NQueueCronJob>();
 
