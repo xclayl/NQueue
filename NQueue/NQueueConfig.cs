@@ -31,7 +31,7 @@ namespace NQueue
         internal async ValueTask<DbConnection?> OpenDbConnection()
         {
             if (CreateDbConnection == null)
-                throw new Exception("Please configure CreateDbConnection in AddNQueueHostedService()");
+                return null;
             var conn = await CreateDbConnection();
             if (conn == null)
                 return null;

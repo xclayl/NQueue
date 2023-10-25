@@ -15,10 +15,10 @@ namespace NQueue.Testing
         private readonly NQueueServiceConfig _config;
         private readonly ILoggerFactory _loggerFactory = new MyLoggerFactory();
 
-        public NQueueHostedServiceFake(NQueueServiceConfig config)
+        public NQueueHostedServiceFake()
         {
-            _config = config;
-            _state = new InternalWorkItemServiceState(new ConfigFactory(config));
+            _config = new NQueueServiceConfig();
+            _state = new InternalWorkItemServiceState(new ConfigFactory(_config));
         }
 
         public async ValueTask EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
