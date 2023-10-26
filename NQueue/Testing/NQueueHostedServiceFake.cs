@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data.Common;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -8,16 +10,18 @@ using NQueue.Internal.Workers;
 
 namespace NQueue.Testing
 {
-
+    
     public class NQueueHostedServiceFake
     {
         private readonly InternalWorkItemServiceState _state;
         private readonly NQueueServiceConfig _config;
         private readonly ILoggerFactory _loggerFactory = new MyLoggerFactory();
 
-        public NQueueHostedServiceFake()
+        public NQueueHostedServiceFake(Uri? baseUri = null)
         {
             _config = new NQueueServiceConfig();
+            if (baseUri != null)
+                _config.LocalHttpAddresses = new[] { baseUri.AbsoluteUri };
             _state = new InternalWorkItemServiceState(new ConfigFactory(_config));
         }
 
@@ -42,6 +46,8 @@ namespace NQueue.Testing
                 hasMore = await consumer.ExecuteOne();
             }
         }
+
+        internal NQueueServiceConfig Config => _config;
 
         private class MyHttpClientFactory : IHttpClientFactory
         {

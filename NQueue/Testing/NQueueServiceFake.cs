@@ -20,6 +20,12 @@ namespace NQueue.Testing
             await _testServiceFake.EnqueueWorkItem(url, queueName, tran, debugInfo, duplicatePrevention);
         }
 
+        public ValueTask<Uri> Localhost(string relativeUri)
+        {
+            var uri = NQueueClient.Localhost(relativeUri, _testServiceFake.Config);
+            return new ValueTask<Uri>(uri);
+        }
+
         public void PollNow()
         {
             // ignore

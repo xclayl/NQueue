@@ -38,7 +38,9 @@ namespace NQueue.Sample.Controllers
 
         public async ValueTask<IActionResult> Enqueue()
         {
-            await _client.Enqueue(new Uri(FindLocalhost(), Url.Action("NoOp")));
+            var a = _server.Features.Get<IServerAddressesFeature>().Addresses.ToList();
+            
+            await _client.Enqueue(await _client.Localhost("NoOp"));
             return Ok("Enqueue Done");
         }
 
@@ -49,7 +51,7 @@ namespace NQueue.Sample.Controllers
             await using var cnn = await dataSource.OpenConnectionAsync();
             await using var tran = await cnn.BeginTransactionAsync();
             
-            await _client.Enqueue(new Uri(FindLocalhost(), Url.Action("NoOp")), tran: tran);
+            await _client.Enqueue(await _client.Localhost("NoOp"), tran: tran);
             await tran.CommitAsync();
             return Ok("Enqueue Done");
         }
@@ -75,28 +77,5 @@ namespace NQueue.Sample.Controllers
 
 
 
-
-        public Uri FindLocalhost()
-        {
-            var urls = 
-                _server.Features.Get<IServerAddressesFeature>().Addresses
-                    .Select(a => new Uri(a))
-                    .Select(u =>
-                    {
-                        if (u.Host == "[::]")
-                        {
-                            var b = new UriBuilder(u);
-                            b.Host = "localhost";
-                            u = b.Uri;
-                        }
-
-                        return u;
-                    })
-                    .ToList();
-
-            return urls
-                .OrderBy(u => u.Scheme == "http" ? 0 : 1)
-                .First();
-        }
     }
 }

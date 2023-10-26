@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
@@ -61,6 +63,8 @@ namespace NQueue.Sample
                 {
                     new NQueueCronJob("my-cron", "*/5 * * * *", "http://localhost:5000/api/NQueue/ErrorOp", "my-queue")
                 };
+
+                config.LocalHttpAddresses = s.GetService<IServer>().Features.Get<IServerAddressesFeature>().Addresses.ToList();
                 
                 return default;
             });

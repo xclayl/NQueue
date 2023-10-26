@@ -23,10 +23,12 @@ namespace NQueue
         public Func<HttpRequestMessage, ValueTask> ModifyHttpRequest { get; set; } = async (r) => { };
         public Func<ValueTask<DbConnection?>> CreateDbConnection { get; set; } = null!;
         public IReadOnlyList<NQueueCronJob> CronJobs = new List<NQueueCronJob>();
+        public IReadOnlyCollection<string> LocalHttpAddresses = new List<string>();
 
         private volatile IWorkItemDbConnection? _workItemDbConnection;
         private readonly InMemoryWorkItemDbConnection _inMemoryWorkItemDbConnection = new InMemoryWorkItemDbConnection();
 
+        
 
         internal async ValueTask<DbConnection?> OpenDbConnection()
         {
