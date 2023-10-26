@@ -15,7 +15,7 @@ namespace NQueue.Testing
     {
         private readonly InternalWorkItemServiceState _state;
         private readonly NQueueServiceConfig _config;
-        private readonly ILoggerFactory _loggerFactory = new MyLoggerFactory();
+        // private readonly ILoggerFactory _loggerFactory = new MyLoggerFactory();
 
         public NQueueHostedServiceFake(Uri? baseUri = null)
         {
@@ -36,15 +36,16 @@ namespace NQueue.Testing
             await _state.EnqueueWorkItem(url, queueName, tran, debugInfo, duplicatePrevention);
         }
 
-        public async ValueTask PollNow(HttpClient client)
+        public async ValueTask PollNow(HttpClient client, ILoggerFactory loggerFactory)
         {
             var consumer = new WorkItemConsumer("testing",
                 TimeSpan.Zero,
                 await _config.GetWorkItemDbConnection(),
                 new MyHttpClientFactory(client),
                 _config,
-                _loggerFactory);
+                loggerFactory);
         
+            
             var hasMore = true;
             while (hasMore)
             {
@@ -66,48 +67,48 @@ namespace NQueue.Testing
             public HttpClient CreateClient(string name) => _client;
         }
 
-
-        private class MyLoggerFactory : ILoggerFactory
-        {
-            public void Dispose()
-            {
-                // do nothing
-            }
-
-            public ILogger CreateLogger(string categoryName) => new MyLogger(categoryName);
-
-            public void AddProvider(ILoggerProvider provider)
-            {
-                // do nothing
-            }
-
-            private class MyLogger : ILogger
-            {
-                private readonly string _categoryName;
-
-                public MyLogger(string categoryName)
-                {
-                    _categoryName = categoryName;
-                }
-
-                public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-                    Func<TState, Exception?, string> formatter)
-                {
-                    Console.WriteLine(formatter(state, exception));
-                }
-
-                public bool IsEnabled(LogLevel logLevel) => true;
-
-                public IDisposable BeginScope<TState>(TState state) => new MyScope();
-
-                private class MyScope : IDisposable
-                {
-                    public void Dispose()
-                    {
-                        // do nothing
-                    }
-                }
-            }
-        }
+        //
+        // private class MyLoggerFactory : ILoggerFactory
+        // {
+        //     public void Dispose()
+        //     {
+        //         // do nothing
+        //     }
+        //
+        //     public ILogger CreateLogger(string categoryName) => new MyLogger(categoryName);
+        //
+        //     public void AddProvider(ILoggerProvider provider)
+        //     {
+        //         // do nothing
+        //     }
+        //
+        //     private class MyLogger : ILogger
+        //     {
+        //         private readonly string _categoryName;
+        //
+        //         public MyLogger(string categoryName)
+        //         {
+        //             _categoryName = categoryName;
+        //         }
+        //
+        //         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+        //             Func<TState, Exception?, string> formatter)
+        //         {
+        //             Console.WriteLine(formatter(state, exception));
+        //         }
+        //
+        //         public bool IsEnabled(LogLevel logLevel) => true;
+        //
+        //         public IDisposable BeginScope<TState>(TState state) => new MyScope();
+        //
+        //         private class MyScope : IDisposable
+        //         {
+        //             public void Dispose()
+        //             {
+        //                 // do nothing
+        //             }
+        //         }
+        //     }
+        // }
     }
 }
