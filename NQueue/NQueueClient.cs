@@ -43,12 +43,17 @@ namespace NQueue
                 throw new Exception(@"LocalHttpAddresses configuration is empty.  Set it using
 services.AddNQueueHostedService((s, config) =>
 {
-     config.LocalHttpAddresses = s.GetService<IServer>().Features.Get<IServerAddressesFeature>().Addresses.ToList();
+     config.LocalHttpAddresses = s.GetService<IServer>()!.Features.Get<IServerAddressesFeature>()!.Addresses.ToList();
 });
 
 Or if this is in a test, 
 
-var fake = new NQueueHostedServiceFake(new Uri(""http://localhost:383838"");
+var myFakeNQueueService = new NQueueHostedServiceFake(new Uri(""http://localhost:383838""));
+
+Or 
+
+var factory = new WebApplicationFactory<Program>();
+myFakeNQueueService.BaseAddress = factory.Server.BaseAddress;
 ");
             
             var urls = 

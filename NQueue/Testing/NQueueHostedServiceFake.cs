@@ -25,6 +25,11 @@ namespace NQueue.Testing
             _state = new InternalWorkItemServiceState(new ConfigFactory(_config));
         }
 
+        public Uri BaseAddress
+        {
+            set => _config.LocalHttpAddresses = new List<string> { value.AbsoluteUri };
+        }
+
         public async ValueTask EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
             bool duplicatePrevention)
         {
