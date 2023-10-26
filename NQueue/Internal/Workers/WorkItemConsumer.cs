@@ -58,7 +58,7 @@ namespace NQueue.Internal.Workers
                 }
 
                 await query.FailWorkItem(request.WorkItemId);
-                logger.Log(LogLevel.Information, "work item failed");
+                logger.Log(LogLevel.Warning, $"work item, {httpReq.Method} {httpReq.RequestUri}, failed with status code {resp.StatusCode}");
                 return false;
             }
             catch (Exception e)
