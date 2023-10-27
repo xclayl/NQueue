@@ -36,7 +36,7 @@ namespace NQueue.Testing
             await _state.EnqueueWorkItem(url, queueName, tran, debugInfo, duplicatePrevention);
         }
 
-        public async ValueTask PollNow(HttpClient client, ILoggerFactory loggerFactory)
+        public async ValueTask PollNow(Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
             var consumer = new WorkItemConsumer("testing",
                 TimeSpan.Zero,
@@ -57,14 +57,14 @@ namespace NQueue.Testing
 
         private class MyHttpClientFactory : IHttpClientFactory
         {
-            private readonly HttpClient _client;
+            private readonly Func<HttpClient> _client;
         
-            public MyHttpClientFactory(HttpClient client)
+            public MyHttpClientFactory(Func<HttpClient> client)
             {
                 _client = client;
             }
         
-            public HttpClient CreateClient(string name) => _client;
+            public HttpClient CreateClient(string name) => _client();
         }
 
         //
