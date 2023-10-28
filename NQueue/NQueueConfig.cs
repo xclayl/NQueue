@@ -5,7 +5,6 @@ using System.Data.Common;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using System.Windows.Markup;
 using NQueue.Internal;
 using NQueue.Internal.Db;
 using NQueue.Internal.Db.InMemory;
@@ -20,7 +19,7 @@ namespace NQueue
         // public bool RunWorkers { get; set; } = true;
         public int QueueRunners { get; set; } = 1;
         public TimeSpan PollInterval { get; set; } = TimeSpan.FromMinutes(5);
-        public Func<HttpRequestMessage, ValueTask> ModifyHttpRequest { get; set; } = async (r) => { };
+        public Func<HttpRequestMessage, ValueTask> ModifyHttpRequest { get; set; } = (_) => ValueTask.CompletedTask;
         public Func<ValueTask<DbConnection?>> CreateDbConnection { get; set; } = null!;
         public IReadOnlyList<NQueueCronJob> CronJobs = new List<NQueueCronJob>();
 
@@ -32,18 +31,16 @@ namespace NQueue
         }
 
         private volatile IWorkItemDbConnection? _workItemDbConnection;
-        private readonly InMemoryWorkItemDbConnection _inMemoryWorkItemDbConnection = new InMemoryWorkItemDbConnection();
+        private readonly InMemoryWorkItemDbConnection _inMemoryWorkItemDbConnection = new();
 
         
 
-        internal async ValueTask<DbConnection?> OpenDbConnection()
+        internal async ValueTask<DbConnection> OpenDbConnection()
         {
             if (CreateDbConnection == null)
-                return null;
+                throw new Exception("This should never happen, CreateDbConnection is null.");
             var conn = await CreateDbConnection();
-            if (conn == null)
-                return null;
-            if (conn.State != ConnectionState.Open)
+            if (conn!.State != ConnectionState.Open)
                 await conn.OpenAsync();
             return conn;
         }
@@ -81,9 +78,9 @@ namespace NQueue
                 { DbServerTypes.Postgres, 0 },
             };
 
-            if (conn.ServerVersion?.Count(c => c == '.') == 2)
+            if (conn.ServerVersion.Count(c => c == '.') == 2)
                 points[DbServerTypes.SqlServer] += 0.1;
-            if (conn.ServerVersion?.Count(c => c == '.') == 1)
+            if (conn.ServerVersion.Count(c => c == '.') == 1)
                 points[DbServerTypes.Postgres] += 0.1;
 
             var schemas = await 

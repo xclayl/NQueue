@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>netcoreapp3.1</TargetFramework>
-        <PackageVersion>0.0.1-alpha-008</PackageVersion>
+        <TargetFramework>net6.0</TargetFramework>
+        <PackageVersion>0.0.1-alpha-009</PackageVersion>
+        <Nullable>enable</Nullable>
         <Authors>Clay Lenhart</Authors>
         <Description>NQueue follows the Outbox pattern by persisting "work items" in your Postgres or SQL Server database using your database transactions by processing them in the background of your dotnet ASPNet Core application.</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>

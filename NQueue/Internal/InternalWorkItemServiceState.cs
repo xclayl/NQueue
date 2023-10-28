@@ -90,7 +90,7 @@ namespace NQueue.Internal
         }
 
 
-        public async ValueTask EnqueueWorkItem(Uri url, string queueName, DbTransaction? tran, string? debugInfo,
+        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
             bool duplicatePrevention)
         {
             if (tran == null)
@@ -99,7 +99,7 @@ namespace NQueue.Internal
                 await EnqueueWorkItem(tran, queueName, url, debugInfo, duplicatePrevention);
         }
 
-        private async ValueTask EnqueueWorkItem(string queueName, Uri url, string? debugInfo,
+        private async ValueTask EnqueueWorkItem(string? queueName, Uri url, string? debugInfo,
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();
@@ -110,7 +110,7 @@ namespace NQueue.Internal
         }
 
 
-        private async ValueTask EnqueueWorkItem(DbTransaction tran, string queueName, Uri url, string? debugInfo,
+        private async ValueTask EnqueueWorkItem(DbTransaction tran, string? queueName, Uri url, string? debugInfo,
             bool duplicatePrevention)
         {
             var config = await _configFactory.GetConfig();

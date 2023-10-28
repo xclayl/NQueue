@@ -15,7 +15,7 @@ namespace NQueue.Internal.Workers
 
         public CronJobWorker(IWorkItemDbConnection workItemDbConnection, TimeZoneInfo tz, ConfigFactory configFactory,
             ILoggerFactory loggerFactory) : base(TimeSpan.FromMinutes(1),
-            typeof(CronJobWorker).FullName, tz, loggerFactory)
+            typeof(CronJobWorker).FullName ?? nameof(CronJobWorker), tz, loggerFactory)
         {
             _workItemDbConnection = workItemDbConnection;
             _configFactory = configFactory;

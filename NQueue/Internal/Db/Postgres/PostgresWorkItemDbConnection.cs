@@ -47,7 +47,7 @@ namespace NQueue.Internal.Db.Postgres
         }
     
         
-        public async ValueTask EnqueueWorkItem(DbTransaction tran, TimeZoneInfo tz, Uri url, string queueName, string debugInfo,
+        public async ValueTask EnqueueWorkItem(DbTransaction tran, TimeZoneInfo tz, Uri url, string? queueName, string? debugInfo,
             bool duplicateProtection)
         {
             await PostgresWorkItemDbQuery.EnqueueWorkItem(tran, tz, url, queueName, debugInfo, duplicateProtection);

@@ -38,7 +38,7 @@ namespace NQueue.Internal
                 if (_config == null)
                 {
                     _config = new NQueueServiceConfig();
-                    await _configBuilder(_serviceProvider, _config);
+                    await _configBuilder!(_serviceProvider!, _config);
 
                     AssertNoDuplicateCronJobNames(_config.CronJobs);
                     AssertValidUrls(_config.CronJobs);

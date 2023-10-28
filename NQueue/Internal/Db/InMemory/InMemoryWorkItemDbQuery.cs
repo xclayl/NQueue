@@ -16,11 +16,11 @@ namespace NQueue.Internal.Db.InMemory
     {
         internal class WorkItem
         {
-            public int WorkItemId { get; set; }
-            public Uri Url { get; set; }
-            public string QueueName { get; set; }
-            public string DebugInfo { get; set; }
-            public bool IsIngested { get; set; }
+            public int WorkItemId { get; init; }
+            public Uri Url { get; init; }
+            public string QueueName { get; init; }
+            public string? DebugInfo { get; init; }
+            public bool IsIngested { get; init; }
         }
 
         private class Queue
@@ -47,7 +47,7 @@ namespace NQueue.Internal.Db.InMemory
             
         }
 
-        public async ValueTask EnqueueWorkItem(Uri url, string queueName, string debugInfo, bool duplicateProtection)
+        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
         {
 
             using var _ = await ALock.Wait(_lock);
@@ -184,53 +184,58 @@ class CronWorkItemTran : IWorkItemDbTransaction
         _nextCronJobId = nextCronJobId;
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _lock?.Dispose();
         _lock = null;
+        return ValueTask.CompletedTask;
     }
 
-    public async ValueTask CommitAsync()
+    public ValueTask CommitAsync()
     {
         _workItems.AddRange(_tempWorkItems);
         _tempWorkItems.Clear();
         _lock?.Dispose();
         _lock = null;
+        return ValueTask.CompletedTask;
     }
 
-    public async ValueTask EnqueueWorkItem(Uri url, string queueName, string debugInfo, bool duplicateProtection)
+    public ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
     {
+        queueName ??= Guid.NewGuid().ToString();
         _tempWorkItems.Add(new InMemoryWorkItemDbQuery.WorkItem
         {
             DebugInfo = debugInfo,
             Url = url,
             QueueName = queueName,
         });
+        return ValueTask.CompletedTask;
     }
 
-    public async ValueTask<int> CreateCronJob(string name)
+    public ValueTask<int> CreateCronJob(string name)
     {
         var cronJobId = _nextCronJobId();
         _tempCronJobState.Add(new CronJobInfo(cronJobId, name, new DateTimeOffset(2000, 1 , 1, 0,0 ,0, TimeSpan.Zero)));
-        return cronJobId;
+        return ValueTask.FromResult(cronJobId);
     }
 
-    public async ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(int cronJobId)
+    public ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(int cronJobId)
     {
         var cj = _cronJobState.Single(j => j.CronJobId == cronJobId);
-       return (cj.LastRanAt, true);
+       return ValueTask.FromResult((cj.LastRanAt, true));
     }
 
-    public async ValueTask UpdateCronJobLastRanAt(int cronJobId)
+    public ValueTask UpdateCronJobLastRanAt(int cronJobId)
     {
         var cj = _cronJobState.Single(j => j.CronJobId == cronJobId);
         _cronJobState.Remove(cj);
         var newCj = new CronJobInfo(cj.CronJobId, cj.CronJobName, DateTimeOffset.Now);
         _cronJobState.Add(newCj);
+        return ValueTask.CompletedTask;
     }
 }
 
-class ALock : IDisposable
+internal class ALock : IDisposable
 {
     public static async ValueTask<IDisposable> Wait(SemaphoreSlim s)
     {
@@ -240,7 +245,7 @@ class ALock : IDisposable
 
     private readonly SemaphoreSlim _locked;
 
-    public ALock(SemaphoreSlim locked)
+    private ALock(SemaphoreSlim locked)
     {
         _locked = locked;
     }

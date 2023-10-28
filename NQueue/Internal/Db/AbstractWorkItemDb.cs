@@ -58,7 +58,7 @@ namespace NQueue.Internal.Db
 
         public static async ValueTask ExecuteNonQuery(DbTransaction tran, string sql, params Func<DbCommand, DbParameter>[] ps)
         {
-            await using var cmd = tran.Connection.CreateCommand();
+            await using var cmd = tran.Connection!.CreateCommand();
             cmd.CommandText = sql;
             cmd.Transaction = tran;
             cmd.Parameters.AddRange(ps.Select(p => p(cmd)).ToArray());
@@ -67,7 +67,7 @@ namespace NQueue.Internal.Db
 
         public static async ValueTask ExecuteProcedure(DbTransaction tran, string procedure, params Func<DbCommand, DbParameter>[] ps)
         {
-            await using var cmd = tran.Connection.CreateCommand();
+            await using var cmd = tran.Connection!.CreateCommand();
             cmd.CommandType = CommandType.StoredProcedure;
             cmd.CommandText = procedure;
             cmd.Transaction = tran;
@@ -79,7 +79,7 @@ namespace NQueue.Internal.Db
         public static async IAsyncEnumerable<T> ExecuteReader<T>(DbTransaction tran, string sql, Func<DbDataReader, T> row,
             params Func<DbCommand, DbParameter>[] ps)
         {
-            await using var cmd = tran.Connection.CreateCommand();
+            await using var cmd = tran.Connection!.CreateCommand();
             cmd.CommandText = sql;
             cmd.Transaction = tran;
             cmd.Parameters.AddRange(ps.Select(p => p(cmd)).ToArray());
