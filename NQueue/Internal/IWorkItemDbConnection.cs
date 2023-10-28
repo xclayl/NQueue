@@ -12,6 +12,7 @@ namespace NQueue.Internal
 
         ValueTask EnqueueWorkItem(DbTransaction tran, TimeZoneInfo tz, Uri url, string? queueName,
             string? debugInfo, bool duplicateProtection);
+
     }
 
     internal interface IWorkItemDbQuery
@@ -24,6 +25,9 @@ namespace NQueue.Internal
         ValueTask CompleteWorkItem(int workItemId);
         ValueTask FailWorkItem(int workItemId);
         ValueTask PurgeWorkItems();
+
+
+        ValueTask DeleteAllNQueueDataForUnitTests();
     }
 
     internal interface IWorkItemDbTransaction : IAsyncDisposable

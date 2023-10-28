@@ -15,11 +15,17 @@ namespace NQueue.Testing
     {
         private readonly InternalWorkItemServiceState _state;
         private readonly NQueueServiceConfig _config;
-        // private readonly ILoggerFactory _loggerFactory = new MyLoggerFactory();
 
-        public NQueueHostedServiceFake(Uri? baseUri = null)
+        public NQueueHostedServiceFake(Uri? baseUri = null) : this(() => ValueTask.FromResult((DbConnection?)null), baseUri)
         {
-            _config = new NQueueServiceConfig();
+        }
+        
+        public NQueueHostedServiceFake(Func<ValueTask<DbConnection?>> cnnBuilder, Uri? baseUri = null)
+        {
+            _config = new NQueueServiceConfig
+            {
+                CreateDbConnection = cnnBuilder
+            };
             if (baseUri != null)
                 _config.LocalHttpAddresses = new[] { baseUri.AbsoluteUri };
             _state = new InternalWorkItemServiceState(new ConfigFactory(_config));
@@ -67,48 +73,12 @@ namespace NQueue.Testing
             public HttpClient CreateClient(string name) => _client();
         }
 
-        //
-        // private class MyLoggerFactory : ILoggerFactory
-        // {
-        //     public void Dispose()
-        //     {
-        //         // do nothing
-        //     }
-        //
-        //     public ILogger CreateLogger(string categoryName) => new MyLogger(categoryName);
-        //
-        //     public void AddProvider(ILoggerProvider provider)
-        //     {
-        //         // do nothing
-        //     }
-        //
-        //     private class MyLogger : ILogger
-        //     {
-        //         private readonly string _categoryName;
-        //
-        //         public MyLogger(string categoryName)
-        //         {
-        //             _categoryName = categoryName;
-        //         }
-        //
-        //         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-        //             Func<TState, Exception?, string> formatter)
-        //         {
-        //             Console.WriteLine(formatter(state, exception));
-        //         }
-        //
-        //         public bool IsEnabled(LogLevel logLevel) => true;
-        //
-        //         public IDisposable BeginScope<TState>(TState state) => new MyScope();
-        //
-        //         private class MyScope : IDisposable
-        //         {
-        //             public void Dispose()
-        //             {
-        //                 // do nothing
-        //             }
-        //         }
-        //     }
-        // }
+
+        public async ValueTask DeleteAllNQueueData()
+        {
+            var db = await _config.GetWorkItemDbConnection();
+            
+            await (await db.Get()).DeleteAllNQueueDataForUnitTests();
+        }
     }
 }

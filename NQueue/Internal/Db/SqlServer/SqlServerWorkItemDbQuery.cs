@@ -81,6 +81,7 @@ namespace NQueue.Internal.Db.SqlServer
             );
         }
 
+
         public async ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState()
         {
             var rows = ExecuteReader(
@@ -137,5 +138,13 @@ namespace NQueue.Internal.Db.SqlServer
         }
 
 
+        public async ValueTask DeleteAllNQueueDataForUnitTests()
+        {
+            await using var db = await _config.OpenDbConnection();
+            foreach (var table in new [] {"workitem", "workitemcompleted", "queue", "cronjob"})
+            {
+                await ExecuteNonQuery($"DELETE FROM nqueue.{table}", db);
+            }
+        }
     }
 }

@@ -1,6 +1,8 @@
 ## Getting Started
-    CREATE USER NQueueUser PASSWORD 'ihSH3jqeVb7giIgOkohX';
-    CREATE SCHEMA IF NOT EXISTS nqueue AUTHORIZATION NQueueUser;
+    CREATE DATABASE nqueue_test;
+    -- in the new database:
+    CREATE USER nqueue_user PASSWORD 'ihSH3jqeVb7giIgOkohX';
+    CREATE SCHEMA IF NOT EXISTS nqueue AUTHORIZATION nqueue_user;
 
 
 
@@ -9,13 +11,15 @@ In "ConfigureServices()" add the following code
     services.AddHttpClient();
     services.AddNQueueHostedService((s, config) =>
     {
-        config.ConnectionString = new SqlConnectionStringBuilder
+        var cnnBuilder = new NpgsqlConnectionStringBuilder()
         {
-            DataSource = "(local)",
-            InitialCatalog = "NQueueTest",
-            UserID = "NQueueUser",
+            DataSource = "localhost",
+            InitialCatalog = "nqueue_test",
+            UserID = "nqueue_user",
             Password = "a_$trong_p4ssword"
-        }.ToString();
+        };
+        cnnBuilder.SslMode = cnnBuilder.Host == "localhost" ? SslMode.Disable : SslMode.VerifyFull;
+        config.CreateDbConnection = () => new ValueTask<DbConnection>(new NpgsqlConnection(cnnBuilder.ToString()));
 
         return default;
     });

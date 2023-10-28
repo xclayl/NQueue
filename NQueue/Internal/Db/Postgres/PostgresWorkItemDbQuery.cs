@@ -136,5 +136,13 @@ namespace NQueue.Internal.Db.Postgres
             );
         }
 
+        public async ValueTask DeleteAllNQueueDataForUnitTests()
+        {
+            await using var db = await _config.OpenDbConnection();
+            foreach (var table in new [] {"workitem", "workitemcompleted", "queue", "cronjob"})
+            {
+                await ExecuteNonQuery($"DELETE FROM nqueue.{table}", db);
+            }
+        }
     }
 }

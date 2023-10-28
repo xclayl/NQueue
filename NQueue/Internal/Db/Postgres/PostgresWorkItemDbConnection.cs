@@ -52,5 +52,6 @@ namespace NQueue.Internal.Db.Postgres
         {
             await PostgresWorkItemDbQuery.EnqueueWorkItem(tran, tz, url, queueName, debugInfo, duplicateProtection);
         }
+
     }
 }

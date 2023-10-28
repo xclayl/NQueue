@@ -15,5 +15,6 @@ namespace NQueue.Internal.Db.InMemory
         {
             throw new Exception("The in-memory NQueue implementation is not compatible with DB transactions.");
         }
+
     }
 }

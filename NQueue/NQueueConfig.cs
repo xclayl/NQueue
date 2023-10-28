@@ -20,7 +20,7 @@ namespace NQueue
         public int QueueRunners { get; set; } = 1;
         public TimeSpan PollInterval { get; set; } = TimeSpan.FromMinutes(5);
         public Func<HttpRequestMessage, ValueTask> ModifyHttpRequest { get; set; } = (_) => ValueTask.CompletedTask;
-        public Func<ValueTask<DbConnection?>> CreateDbConnection { get; set; } = null!;
+        public Func<ValueTask<DbConnection?>> CreateDbConnection { get; set; } = () => ValueTask.FromResult((DbConnection?) null);
         public IReadOnlyList<NQueueCronJob> CronJobs = new List<NQueueCronJob>();
 
         private volatile IReadOnlyCollection<string> _localHttpAddresses = new List<string>();
@@ -33,13 +33,27 @@ namespace NQueue
         private volatile IWorkItemDbConnection? _workItemDbConnection;
         private readonly InMemoryWorkItemDbConnection _inMemoryWorkItemDbConnection = new();
 
-        
+
+
+        private async ValueTask<DbConnection?> OpenDbConnectionForDetection()
+        {
+            if (CreateDbConnection == null)
+                throw new Exception("This should never happen, CreateDbConnection is null.");
+            var conn = await CreateDbConnection();
+            if (conn == null)
+                return null;
+            if (conn!.State != ConnectionState.Open)
+                await conn.OpenAsync();
+            return conn;
+        }
 
         internal async ValueTask<DbConnection> OpenDbConnection()
         {
             if (CreateDbConnection == null)
                 throw new Exception("This should never happen, CreateDbConnection is null.");
             var conn = await CreateDbConnection();
+            if (conn == null)
+                throw new Exception("This should never happen, CreateDbConnection returned a null.");
             if (conn!.State != ConnectionState.Open)
                 await conn.OpenAsync();
             return conn;
@@ -65,7 +79,7 @@ namespace NQueue
 
         private async ValueTask<DbServerTypes> DetectServerType()
         {
-            await using var conn = await OpenDbConnection();
+            await using var conn = await OpenDbConnectionForDetection();
             if (conn == null)
                 return DbServerTypes.InMemory;
             // Console.WriteLine(conn.ServerVersion);

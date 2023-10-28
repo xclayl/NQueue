@@ -31,11 +31,11 @@ namespace NQueue.Internal.Db.InMemory
 
 
 
-        private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
-        private readonly List<WorkItem> _workItems = new List<WorkItem>();
-        private readonly List<WorkItem> _completedWorkItems = new List<WorkItem>();
-        private readonly List<CronJobInfo> _cronJobState = new List<CronJobInfo>();
-        private readonly List<Queue> _queues = new List<Queue>();
+        private readonly SemaphoreSlim _lock = new(1, 1);
+        private readonly List<WorkItem> _workItems = new();
+        private readonly List<WorkItem> _completedWorkItems = new();
+        private readonly List<CronJobInfo> _cronJobState = new();
+        private readonly List<Queue> _queues = new();
         private int _nextId = 23;
         
         public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()
@@ -161,6 +161,16 @@ namespace NQueue.Internal.Db.InMemory
             using var _ = await ALock.Wait(_lock);
 
             _completedWorkItems.Clear();
+        }
+
+        public async ValueTask DeleteAllNQueueDataForUnitTests()
+        {
+            using var _ = await ALock.Wait(_lock);
+
+            _workItems.Clear();
+            _completedWorkItems.Clear();
+            _queues.Clear();
+            _cronJobState.Clear();
         }
     }
 }

@@ -53,5 +53,6 @@ namespace NQueue.Internal.Db.SqlServer
         {
             await SqlServerWorkItemDbQuery.EnqueueWorkItem(tran, tz, url, queueName, debugInfo, duplicateProtection);
         }
+
     }
 }
