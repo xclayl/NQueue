@@ -1,9 +1,9 @@
 ﻿using System.Data.Common;
 using System.Threading.Tasks;
 
-namespace NQueue.Tests.InMemory;
+namespace NQueue.Tests.DbTesting;
 
-public class DbCreator : IDbCreator
+public class InMemoryDbCreator : IDbCreator
 {
     public ValueTask DisposeAsync() => default;
 

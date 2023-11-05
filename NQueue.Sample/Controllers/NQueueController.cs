@@ -9,13 +9,14 @@ using Npgsql;
 
 namespace NQueue.Sample.Controllers
 {
-    [ApiController()]
+    [ApiController]
     [Route("api/[controller]/[action]")]
     public class NQueueController : Controller
     {
         private readonly INQueueClient _client;
         private readonly INQueueService _service;
         private readonly IServer _server;
+        private static volatile string? _msg;
 
         public NQueueController(INQueueClient client, INQueueService service, IServer server)
         {
@@ -29,6 +30,18 @@ namespace NQueue.Sample.Controllers
         public IActionResult NoOp()
         {
             return Ok("Done");
+        }
+
+        [HttpGet("{msg}")]
+        public void SetMessage([FromRoute] string msg)
+        {
+            _msg = msg;
+        }
+
+        [HttpGet]
+        public string GetMessage()
+        {
+            return _msg;
         }
 
         public IActionResult ErrorOp()

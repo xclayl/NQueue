@@ -3,11 +3,10 @@ using System.Threading.Tasks;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Microsoft.Data.SqlClient;
-using Npgsql;
 
-namespace NQueue.Tests.SqlServer;
+namespace NQueue.Tests.DbTesting;
 
-public class DbCreator : IDbCreator
+public class SqlServerDbCreator : IDbCreator
 {
     private const string Password = "ihSH3jqeVb7giIgOkohX";
     private bool _dbCreated = false;

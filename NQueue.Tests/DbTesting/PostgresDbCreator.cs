@@ -1,13 +1,12 @@
-﻿using System;
-using System.Data.Common;
+﻿using System.Data.Common;
 using System.Threading.Tasks;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Npgsql;
 
-namespace NQueue.Tests.Postgres;
+namespace NQueue.Tests.DbTesting;
 
-public class DbCreator : IDbCreator
+public class PostgresDbCreator : IDbCreator
 {
     private const string Password = "ihSH3jqeVb7giIgOkohX";
     private bool _dbCreated = false;
