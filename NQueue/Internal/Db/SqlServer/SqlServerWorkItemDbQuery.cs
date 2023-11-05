@@ -110,31 +110,28 @@ namespace NQueue.Internal.Db.SqlServer
         }
 
 
-        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
+        public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
         {
-            await ExecuteNonQuery(
-                "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection",
-                await _config.OpenDbConnection(),
-                SqlParameter("@QueueName", queueName),
-                SqlParameter("@Url", url.ToString()),
-                SqlParameter("@DebugInfo", debugInfo),
-                SqlParameter("@Now", Now),
-                SqlParameter("@DuplicateProtection", duplicateProtection)
-            );
-        }
-
-        public static async ValueTask EnqueueWorkItem(DbTransaction tran, TimeZoneInfo tz, Uri url, string? queueName, 
-            string? debugInfo, bool duplicateProtection)
-        {
-            await ExecuteNonQuery(
-                tran,
-                "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection",
-                SqlParameter("@QueueName", queueName),
-                SqlParameter("@Url", url.ToString()),
-                SqlParameter("@DebugInfo", debugInfo),
-                SqlParameter("@Now", NowIn(tz)),
-                SqlParameter("@DuplicateProtection", duplicateProtection)
-            );
+            if (tran == null) 
+                await ExecuteNonQuery(
+                    "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection",
+                    await _config.OpenDbConnection(),
+                    SqlParameter("@QueueName", queueName),
+                    SqlParameter("@Url", url.ToString()),
+                    SqlParameter("@DebugInfo", debugInfo),
+                    SqlParameter("@Now", Now),
+                    SqlParameter("@DuplicateProtection", duplicateProtection)
+                );
+            else
+                await ExecuteNonQuery(
+                    tran,
+                    "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection",
+                    SqlParameter("@QueueName", queueName),
+                    SqlParameter("@Url", url.ToString()),
+                    SqlParameter("@DebugInfo", debugInfo),
+                    SqlParameter("@Now", Now),
+                    SqlParameter("@DuplicateProtection", duplicateProtection)
+                );
         }
 
 

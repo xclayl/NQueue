@@ -12,8 +12,8 @@ namespace NQueue.Internal.Db.SqlServer
     internal class SqlServerWorkItemDbConnection : IWorkItemDbConnection
     {
         private readonly NQueueServiceConfig _config;
-        private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
-        private volatile bool _dbMigrationRan = false;
+        private readonly SemaphoreSlim _lock = new(1, 1);
+        private volatile bool _dbMigrationRan;
 
         internal SqlServerWorkItemDbConnection(NQueueServiceConfig config)
         {
@@ -47,12 +47,5 @@ namespace NQueue.Internal.Db.SqlServer
                 }
             }
         }
-
-        public async ValueTask EnqueueWorkItem(DbTransaction tran, TimeZoneInfo tz, Uri url, string? queueName,
-            string? debugInfo, bool duplicateProtection)
-        {
-            await SqlServerWorkItemDbQuery.EnqueueWorkItem(tran, tz, url, queueName, debugInfo, duplicateProtection);
-        }
-
     }
 }

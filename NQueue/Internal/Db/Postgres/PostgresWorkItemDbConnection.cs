@@ -9,8 +9,8 @@ namespace NQueue.Internal.Db.Postgres
     internal class PostgresWorkItemDbConnection : IWorkItemDbConnection
     {
         private readonly NQueueServiceConfig _config;
-        private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
-        private volatile bool _dbMigrationRan = false;
+        private readonly SemaphoreSlim _lock = new(1, 1);
+        private volatile bool _dbMigrationRan;
     
         public PostgresWorkItemDbConnection(NQueueServiceConfig config)
         {
@@ -47,11 +47,5 @@ namespace NQueue.Internal.Db.Postgres
         }
     
         
-        public async ValueTask EnqueueWorkItem(DbTransaction tran, TimeZoneInfo tz, Uri url, string? queueName, string? debugInfo,
-            bool duplicateProtection)
-        {
-            await PostgresWorkItemDbQuery.EnqueueWorkItem(tran, tz, url, queueName, debugInfo, duplicateProtection);
-        }
-
     }
 }

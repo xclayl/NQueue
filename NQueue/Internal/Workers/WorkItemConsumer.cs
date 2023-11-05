@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using NQueue.Internal.Db;
 
 namespace NQueue.Internal.Workers
 {
@@ -42,6 +44,11 @@ namespace NQueue.Internal.Workers
 
             try
             {
+                // var traceId = Activity.Current?.TraceId.ToString();
+                // var spanId = Activity.Current?.SpanId.ToString();
+                //
+                // new ActivitySource().StartActivity()
+                
                 using var httpClient = _httpClientFactory.CreateClient();
 
                 using var httpReq = new HttpRequestMessage();

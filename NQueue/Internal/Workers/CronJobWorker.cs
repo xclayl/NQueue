@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Cronos;
 using Microsoft.Extensions.Logging;
+using NQueue.Internal.Db;
 using NQueue.Internal.Model;
 
 namespace NQueue.Internal.Workers

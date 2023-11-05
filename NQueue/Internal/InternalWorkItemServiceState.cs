@@ -93,29 +93,11 @@ namespace NQueue.Internal
         public async ValueTask EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
             bool duplicatePrevention)
         {
-            if (tran == null)
-                await EnqueueWorkItem(queueName, url, debugInfo, duplicatePrevention);
-            else
-                await EnqueueWorkItem(tran, queueName, url, debugInfo, duplicatePrevention);
-        }
-
-        private async ValueTask EnqueueWorkItem(string? queueName, Uri url, string? debugInfo,
-            bool duplicatePrevention)
-        {
             var config = await _configFactory.GetConfig();
             var conn = await config.GetWorkItemDbConnection();
 
             var query = await conn.Get();
-            await query.EnqueueWorkItem(url, queueName, debugInfo, duplicatePrevention);
-        }
-
-
-        private async ValueTask EnqueueWorkItem(DbTransaction tran, string? queueName, Uri url, string? debugInfo,
-            bool duplicatePrevention)
-        {
-            var config = await _configFactory.GetConfig();
-            var wiConn = await config.GetWorkItemDbConnection();
-            await wiConn.EnqueueWorkItem(tran, config.TimeZone, url, queueName, debugInfo, duplicatePrevention);
+            await query.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicatePrevention);
         }
 
 

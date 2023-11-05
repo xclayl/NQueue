@@ -24,14 +24,7 @@ namespace NQueue
         }
 
 
-        public async ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null,
-            bool duplicatePrevention = false)
-        {
-            if (tran == null)
-                await EnqueueWorkItem(url, queueName, debugInfo, duplicatePrevention);
-            else
-                await EnqueueWorkItem(tran, url, queueName, debugInfo, duplicatePrevention);
-        }
+
 
         public async ValueTask<Uri> Localhost(string relativeUri)
         {
@@ -80,25 +73,21 @@ myFakeNQueueService.BaseAddress = factory.Server.BaseAddress;
         }
 
 
-        private async ValueTask EnqueueWorkItem(Uri url, string? queueName, string? debugInfo,
-            bool duplicatePrevention)
+        public async ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null,
+            bool duplicatePrevention = false)
         {
             var config = await _configFactory.GetConfig();
             var conn = await config.GetWorkItemDbConnection();
             
             var query = await conn.Get();
+            
+            // TODO capture Activity info
 
-            await query.EnqueueWorkItem(url, queueName, debugInfo, duplicatePrevention);
+            await query.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicatePrevention);
         }
 
 
-        private async ValueTask EnqueueWorkItem(DbTransaction tran, Uri url, string? queueName, string? debugInfo,
-            bool duplicatePrevention)
-        {
-            var config = await _configFactory.GetConfig();
-            var wiConn = await config.GetWorkItemDbConnection();
-            await wiConn.EnqueueWorkItem(tran, config.TimeZone, url, queueName, debugInfo, duplicatePrevention);
-        }
+        
 
     }
 }

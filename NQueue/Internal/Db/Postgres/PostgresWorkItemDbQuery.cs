@@ -109,31 +109,28 @@ namespace NQueue.Internal.Db.Postgres
 
         
         
-        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
+        public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
         {
-            await ExecuteProcedure(
-                "nqueue.EnqueueWorkItem",
-                await _config.OpenDbConnection(),
-                SqlParameter(url.ToString()),
-                SqlParameter(queueName),
-                SqlParameter(debugInfo),
-                SqlParameter(NowUtc),
-                SqlParameter(duplicateProtection)
-            );
-        }
-
-        public static async ValueTask EnqueueWorkItem(DbTransaction tran, TimeZoneInfo tz, Uri url, string? queueName, 
-            string? debugInfo, bool duplicateProtection)
-        {
-            await ExecuteProcedure(
-                tran,
-                "nqueue.EnqueueWorkItem",
-                SqlParameter(url.ToString()),
-                SqlParameter(queueName),
-                SqlParameter(debugInfo),
-                SqlParameter(NowIn(TimeZoneInfo.Utc)),
-                SqlParameter(duplicateProtection)
-            );
+            if (tran == null)
+                await ExecuteProcedure(
+                    "nqueue.EnqueueWorkItem",
+                    await _config.OpenDbConnection(),
+                    SqlParameter(url.ToString()),
+                    SqlParameter(queueName),
+                    SqlParameter(debugInfo),
+                    SqlParameter(NowUtc),
+                    SqlParameter(duplicateProtection)
+                );
+            else
+                await ExecuteProcedure(
+                    tran,
+                    "nqueue.EnqueueWorkItem",
+                    SqlParameter(url.ToString()),
+                    SqlParameter(queueName),
+                    SqlParameter(debugInfo),
+                    SqlParameter(NowUtc),
+                    SqlParameter(duplicateProtection)
+                );
         }
 
         public async ValueTask DeleteAllNQueueDataForUnitTests()

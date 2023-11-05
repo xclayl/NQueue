@@ -4,21 +4,17 @@ using System.Data.Common;
 using System.Threading.Tasks;
 using NQueue.Internal.Model;
 
-namespace NQueue.Internal
+namespace NQueue.Internal.Db
 {
     internal interface IWorkItemDbConnection
     {
         ValueTask<IWorkItemDbQuery> Get();
-
-        ValueTask EnqueueWorkItem(DbTransaction tran, TimeZoneInfo tz, Uri url, string? queueName,
-            string? debugInfo, bool duplicateProtection);
-
     }
 
     internal interface IWorkItemDbQuery
     {
         ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck();
-        ValueTask EnqueueWorkItem(Uri url, string? queueName, string? debugInfo, bool duplicateProtection);
+        ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection);
         ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState();
         ValueTask<IWorkItemDbTransaction> BeginTran();
         ValueTask<WorkItemInfo?> NextWorkItem();
