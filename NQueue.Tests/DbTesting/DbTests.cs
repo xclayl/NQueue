@@ -50,14 +50,12 @@ public class DbTests : IAsyncLifetime
 
     [Theory]
     [MemberData(nameof(MyTheoryData))]
-    public async Task Test(DbType dbType)
+    public async Task HappyPath(DbType dbType)
     {
         // arrange 
         await using var app = await SampleWebAppBuilder.Build(_dbCreators[dbType]);
-
         var nQueueClient = app.Application.Services.GetRequiredService<INQueueClient>();
         var guid = Guid.NewGuid();
-        
         
         // act
         await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"));
@@ -68,7 +66,6 @@ public class DbTests : IAsyncLifetime
         var http = app.Application.CreateClient();
         using var r = await http.GetAsync(await nQueueClient.Localhost($"api/NQueue/GetMessage"));
         r.EnsureSuccessStatusCode();
-
         (await r.Content.ReadAsStringAsync()).Should().Be($"{guid}");
     }
 }
