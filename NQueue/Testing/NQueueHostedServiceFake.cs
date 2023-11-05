@@ -46,7 +46,7 @@ namespace NQueue.Testing
         /// <summary>
         /// Wait and process all work items
         /// </summary>
-        public async ValueTask PollAll(Func<HttpClient> client, ILoggerFactory loggerFactory)
+        public async ValueTask ProcessAll(Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
             var consumer = new WorkItemConsumer("testing",
                 TimeSpan.Zero,
@@ -66,7 +66,7 @@ namespace NQueue.Testing
         /// <summary>
         /// Wait and process one (or zero) work items
         /// </summary>
-        public async ValueTask PollOne(Func<HttpClient> client, ILoggerFactory loggerFactory)
+        public async ValueTask ProcessOne(Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
             var consumer = new WorkItemConsumer("testing",
                 TimeSpan.Zero,

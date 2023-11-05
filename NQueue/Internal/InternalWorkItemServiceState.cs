@@ -15,9 +15,6 @@ namespace NQueue.Internal
         ValueTask<(bool healthy, string stateInfo)> HealthCheck();
         void Configure(IReadOnlyList<IWorker> workers);
 
-        // ValueTask EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
-        //     bool duplicatePrevention);
-
         void PollNow();
     }
 
