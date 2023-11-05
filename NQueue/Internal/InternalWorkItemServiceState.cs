@@ -55,8 +55,7 @@ namespace NQueue.Internal
 
             var conn = await config.GetWorkItemDbConnection();
 
-            var query = await conn.Get();
-            var queueState = await query.QueueHealthCheck();
+            var queueState = await conn.QueueHealthCheck();
 
             states = states.Concat(new[]
                 {

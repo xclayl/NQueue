@@ -24,8 +24,7 @@ namespace NQueue.Internal.Workers
 
         protected internal override async ValueTask<bool> ExecuteOne()
         {
-            var query = await _workItemDbConnection.Get();
-            var cronJobState = (await query.GetCronJobState())
+            var cronJobState = (await _workItemDbConnection.GetCronJobState())
                 .ToDictionary(r => r.CronJobName);
 
             var cronJobs = (await _configFactory.GetConfig()).CronJobs;
@@ -44,7 +43,7 @@ namespace NQueue.Internal.Workers
                     if (next < DateTimeOffset.Now)
                     {
                         logger.LogInformation($"Cron Job triggered: {cronJob.Name}");
-                        await ProcessCron(state, cronJob, query);
+                        await ProcessCron(state, cronJob);
                     }
                 }
                 catch (Exception e)
@@ -55,9 +54,9 @@ namespace NQueue.Internal.Workers
             return false;
         }
 
-        private async ValueTask ProcessCron(CronJobInfo? state, NQueueCronJob nQueueCronJob, IWorkItemDbQuery query)
+        private async ValueTask ProcessCron(CronJobInfo? state, NQueueCronJob nQueueCronJob)
         {
-            await using var tran = await query.BeginTran();
+            await using var tran = await _workItemDbConnection.BeginTran();
 
             if (state == null)
             {

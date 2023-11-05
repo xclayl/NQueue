@@ -8,7 +8,7 @@ using NQueue.Internal.Model;
 
 namespace NQueue.Internal.Db.InMemory;
 
-internal class InMemoryWorkItemDbQuery : IWorkItemDbQuery
+internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
 {
     internal class WorkItem
     {
@@ -34,14 +34,6 @@ internal class InMemoryWorkItemDbQuery : IWorkItemDbQuery
     private readonly List<Queue> _queues = new();
     private int _nextId = 23;
         
-    public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()
-    {
-        using var _ = await ALock.Wait(_lock);
-            
-        throw new NotImplementedException();
-            
-            
-    }
 
     public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
     {
@@ -72,13 +64,13 @@ internal class InMemoryWorkItemDbQuery : IWorkItemDbQuery
             
     }
 
-    public async ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState()
+    internal async ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState()
     {
         using var _ = await ALock.Wait(_lock);
         return _cronJobState.ToList();
     }
 
-    public async ValueTask<IWorkItemDbTransaction> BeginTran()
+    internal async ValueTask<ICronTransaction> BeginTran()
     {
         await _lock.WaitAsync();
         return new CronWorkItemTran(_lock, _workItems, _cronJobState, () => _nextId++);
@@ -172,18 +164,18 @@ internal class InMemoryWorkItemDbQuery : IWorkItemDbQuery
     }
 }
 
-class CronWorkItemTran : IWorkItemDbTransaction
+class CronWorkItemTran : ICronTransaction
 {
     private IDisposable? _lock;
-    private readonly List<InMemoryWorkItemDbQuery.WorkItem> _workItems;
+    private readonly List<InMemoryWorkItemDbProcs.WorkItem> _workItems;
     private readonly List<CronJobInfo> _cronJobState;
     private readonly Func<int> _nextCronJobId;
     
     
-    private readonly List<InMemoryWorkItemDbQuery.WorkItem> _tempWorkItems=new List<InMemoryWorkItemDbQuery.WorkItem>();
+    private readonly List<InMemoryWorkItemDbProcs.WorkItem> _tempWorkItems=new List<InMemoryWorkItemDbProcs.WorkItem>();
     private readonly List<CronJobInfo> _tempCronJobState = new List<CronJobInfo>(); 
 
-    public CronWorkItemTran(IDisposable @lock, List<InMemoryWorkItemDbQuery.WorkItem> workItems, List<CronJobInfo> cronJobState, Func<int> nextCronJobId)
+    public CronWorkItemTran(IDisposable @lock, List<InMemoryWorkItemDbProcs.WorkItem> workItems, List<CronJobInfo> cronJobState, Func<int> nextCronJobId)
     {
         _lock = @lock;
         _workItems = workItems;
@@ -210,7 +202,7 @@ class CronWorkItemTran : IWorkItemDbTransaction
     public ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
     {
         queueName ??= Guid.NewGuid().ToString();
-        _tempWorkItems.Add(new InMemoryWorkItemDbQuery.WorkItem
+        _tempWorkItems.Add(new InMemoryWorkItemDbProcs.WorkItem
         {
             DebugInfo = debugInfo,
             Url = url,

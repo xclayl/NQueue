@@ -8,15 +8,15 @@ namespace NQueue.Internal.Db
 {
     internal interface IWorkItemDbConnection
     {
-        ValueTask<IWorkItemDbQuery> Get();
+        ValueTask<IWorkItemDbProcs> Get();
+        ValueTask<ICronTransaction> BeginTran();
+        ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck();
+        ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState();
     }
 
-    internal interface IWorkItemDbQuery
+    internal interface IWorkItemDbProcs
     {
-        ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck();
         ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection);
-        ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState();
-        ValueTask<IWorkItemDbTransaction> BeginTran();
         ValueTask<WorkItemInfo?> NextWorkItem();
         ValueTask CompleteWorkItem(int workItemId);
         ValueTask FailWorkItem(int workItemId);
@@ -26,7 +26,7 @@ namespace NQueue.Internal.Db
         ValueTask DeleteAllNQueueDataForUnitTests();
     }
 
-    internal interface IWorkItemDbTransaction : IAsyncDisposable
+    internal interface ICronTransaction : IAsyncDisposable
     {
         ValueTask CommitAsync();
         ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection);

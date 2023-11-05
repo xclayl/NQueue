@@ -7,23 +7,16 @@ using NQueue.Internal.Model;
 
 namespace NQueue.Internal.Db.Postgres
 {
-    internal class PostgresWorkItemDbQuery : PostgresAbstractWorkItemDb, IWorkItemDbQuery
+    internal class PostgresWorkItemDbProcs : PostgresAbstractWorkItemDb, IWorkItemDbProcs
     {
         private readonly NQueueServiceConfig _config;
     
-        public PostgresWorkItemDbQuery(NQueueServiceConfig config): base(config.TimeZone)
+        public PostgresWorkItemDbProcs(NQueueServiceConfig config): base(config.TimeZone)
         {
             _config = config;
         }
         
         
-
-        public async ValueTask<IWorkItemDbTransaction> BeginTran()
-        {
-            var conn = await _config.OpenDbConnection();
-            return new PostgresWorkItemDbTransaction(await conn.BeginTransactionAsync(), conn, _tz);
-        }
-
         
         public async ValueTask<WorkItemInfo?> NextWorkItem()
         {
@@ -78,33 +71,6 @@ namespace NQueue.Internal.Db.Postgres
                 await _config.OpenDbConnection(),
                 SqlParameter(NowUtc)
             );
-        }
-
-        public async ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState()
-        {
-            var rows = ExecuteReader(
-                "SELECT CronJobId, CronJobName, LastRanAt FROM NQueue.CronJob",
-                await _config.OpenDbConnection(),
-                reader => new CronJobInfo(
-                    reader.GetInt32(0),
-                    reader.GetString(1),
-                    new DateTimeOffset(reader.GetDateTime(2), TimeSpan.Zero)
-                ));
-
-            return await rows.ToListAsync();
-        }
-
-
-        public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()
-        {
-            var rows = ExecuteReader(
-                "SELECT COUNT(*) FROM NQueue.Queue WHERE ErrorCount >= 5",
-                await _config.OpenDbConnection(),
-                reader => reader.GetInt32(0));
-
-            var count = await rows.SingleAsync();
-
-            return (count == 0, count);
         }
 
         

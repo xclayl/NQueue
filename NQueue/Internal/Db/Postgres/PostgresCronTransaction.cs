@@ -5,12 +5,12 @@ using System.Threading.Tasks;
 
 namespace NQueue.Internal.Db.Postgres
 {
-    internal class PostgresWorkItemDbTransaction: PostgresAbstractWorkItemDb, IWorkItemDbTransaction
+    internal class PostgresCronTransaction: PostgresAbstractWorkItemDb, ICronTransaction
     {
         private readonly DbTransaction _tran;
         private readonly DbConnection _conn;
 
-        public PostgresWorkItemDbTransaction(DbTransaction tran, DbConnection conn, TimeZoneInfo tz): base(tz)
+        public PostgresCronTransaction(DbTransaction tran, DbConnection conn, TimeZoneInfo tz): base(tz)
         {
             _tran = tran;
             _conn = conn;

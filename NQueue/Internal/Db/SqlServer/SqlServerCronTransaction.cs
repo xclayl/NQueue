@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 namespace NQueue.Internal.Db.SqlServer
 {
 
-    internal class SqlServerWorkItemDbTransaction : SqlServerAbstractWorkItemDb, IWorkItemDbTransaction
+    internal class SqlServerCronTransaction : SqlServerAbstractWorkItemDb, ICronTransaction
     {
         private readonly DbTransaction _tran;
         private readonly DbConnection _conn;
 
-        public SqlServerWorkItemDbTransaction(DbTransaction tran, DbConnection conn, TimeZoneInfo tz) : base(tz)
+        public SqlServerCronTransaction(DbTransaction tran, DbConnection conn, TimeZoneInfo tz) : base(tz)
         {
             _tran = tran;
             _conn = conn;
