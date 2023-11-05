@@ -13,8 +13,8 @@ namespace NQueue.Testing
     
     public class NQueueHostedServiceFake
     {
-        private readonly InternalWorkItemServiceState _state;
         private readonly NQueueServiceConfig _config;
+        private readonly NQueueServiceFake _service;
 
         public NQueueHostedServiceFake(Uri? baseUri = null) : this(() => ValueTask.FromResult((DbConnection?)null), baseUri)
         {
@@ -28,21 +28,25 @@ namespace NQueue.Testing
             };
             if (baseUri != null)
                 _config.LocalHttpAddresses = new[] { baseUri.AbsoluteUri };
-            _state = new InternalWorkItemServiceState(new ConfigFactory(_config));
+            var configFactory = new ConfigFactory(_config);
+
+            _service = new NQueueServiceFake(configFactory);
+
         }
+
+        public INQueueClient Client => _service;
+        public INQueueService Service => _service;
 
         public Uri BaseAddress
         {
             set => _config.LocalHttpAddresses = new List<string> { value.AbsoluteUri };
         }
 
-        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
-            bool duplicatePrevention)
-        {
-            await _state.EnqueueWorkItem(url, queueName, tran, debugInfo, duplicatePrevention);
-        }
 
-        public async ValueTask PollNow(Func<HttpClient> client, ILoggerFactory loggerFactory)
+        /// <summary>
+        /// Wait and process all work items
+        /// </summary>
+        public async ValueTask PollAll(Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
             var consumer = new WorkItemConsumer("testing",
                 TimeSpan.Zero,
@@ -58,8 +62,23 @@ namespace NQueue.Testing
                 hasMore = await consumer.ExecuteOne();
             }
         }
+        
+        /// <summary>
+        /// Wait and process one (or zero) work items
+        /// </summary>
+        public async ValueTask PollOne(Func<HttpClient> client, ILoggerFactory loggerFactory)
+        {
+            var consumer = new WorkItemConsumer("testing",
+                TimeSpan.Zero,
+                await _config.GetWorkItemDbConnection(),
+                new MyHttpClientFactory(client),
+                _config,
+                loggerFactory);
+        
+            
+            await consumer.ExecuteOne();
+        }
 
-        internal NQueueServiceConfig Config => _config;
 
         private class MyHttpClientFactory : IHttpClientFactory
         {

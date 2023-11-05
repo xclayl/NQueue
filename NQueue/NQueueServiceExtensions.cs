@@ -56,10 +56,8 @@ namespace NQueue
             services.RemoveAll<InternalConfig>();
             services.AddSingleton(InternalConfig.AsDisabled);
 
-            var internalTestService = new NQueueServiceFake(testServiceFake);
-
-            services.AddSingleton<INQueueService>(internalTestService);
-            services.AddSingleton<INQueueClient>(internalTestService);
+            services.AddSingleton<INQueueService>(testServiceFake.Service);
+            services.AddSingleton<INQueueClient>(testServiceFake.Client);
 
             return services;
         }

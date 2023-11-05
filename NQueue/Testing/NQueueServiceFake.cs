@@ -1,30 +1,18 @@
 ﻿using System;
 using System.Data.Common;
 using System.Threading.Tasks;
+using NQueue.Internal;
 
 namespace NQueue.Testing
 {
-    internal class NQueueServiceFake : INQueueService, INQueueClient
+    internal class NQueueServiceFake : NQueueClient, INQueueService
     {
-        private readonly NQueueHostedServiceFake _testServiceFake;
-
-        public NQueueServiceFake(NQueueHostedServiceFake testServiceFake)
+        public NQueueServiceFake(ConfigFactory configFactory): base(configFactory)
         {
-            _testServiceFake = testServiceFake;
         }
 
-        public ValueTask<(bool healthy, string stateInfo)> HealthCheck() => new ValueTask<(bool healthy, string stateInfo)>((true, "Testing Service"));
+        public ValueTask<(bool healthy, string stateInfo)> HealthCheck() => new((true, "Testing Service"));
 
-        public async ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null, bool duplicatePrevention = false)
-        {
-            await _testServiceFake.EnqueueWorkItem(url, queueName, tran, debugInfo, duplicatePrevention);
-        }
-
-        public ValueTask<Uri> Localhost(string relativeUri)
-        {
-            var uri = NQueueClient.Localhost(relativeUri, _testServiceFake.Config);
-            return new ValueTask<Uri>(uri);
-        }
 
         public void PollNow()
         {

@@ -59,7 +59,7 @@ public class DbTests : IAsyncLifetime
         
         // act
         await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"));
-        await app.FakeService.PollNow(app.Application.CreateClient,
+        await app.FakeService.PollAll(app.Application.CreateClient,
             app.Application.Services.GetRequiredService<ILoggerFactory>());
 
         // assert
