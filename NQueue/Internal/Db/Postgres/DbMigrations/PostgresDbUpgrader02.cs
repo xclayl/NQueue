@@ -1,80 +1,17 @@
 ﻿using System.Data.Common;
 using System.Threading.Tasks;
 
-namespace NQueue.Internal.Db.Postgres.DbMigrations
+namespace NQueue.Internal.Db.Postgres.DbMigrations;
+
+internal class PostgresDbUpgrader02
 {
-    internal class PostgresDbUpgrader01
-    {
-        
-        
-        
-        public async ValueTask Upgrade(DbTransaction tran)
-        {
-            var sql = @"
+    public async ValueTask Upgrade(DbTransaction tran)
+    { 
+        var sql = @"
+ALTER TABLE NQueue.WorkItem ADD COLUMN IF NOT EXISTS Internal JSONB;
+ALTER TABLE NQueue.WorkItemCompleted ADD COLUMN IF NOT EXISTS Internal JSONB;
 
 
-CREATE TABLE IF NOT EXISTS NQueue.CronJob (
-	CronJobId serial,
-	Active boolean NOT NULL,
-	LastRanAt timestamp with time zone NOT NULL,
-	CronJobName varchar(50) NOT NULL,
-
-    CONSTRAINT PK_CronJob PRIMARY KEY(CronJobId),
-    CONSTRAINT AK_CronJob_CronJobName UNIQUE (CronJobName)
-);
-
-CREATE TABLE IF NOT EXISTS NQueue.Queue(
-	QueueId serial,
-	Name varchar(50) NOT NULL,
-	NextWorkItemId int NOT NULL,
-	ErrorCount int NOT NULL,
-	LockedUntil timestamp with time zone NOT NULL,
-    CONSTRAINT PK_Queue PRIMARY KEY (QueueId),
-    CONSTRAINT AK_Queue_Name UNIQUE (Name)
-);
-
-
-CREATE UNIQUE INDEX IF NOT EXISTS IX_NQueue_Queue_LockedUntil_NextWorkItemId
-ON NQueue.Queue (LockedUntil,NextWorkItemId,QueueId)
-INCLUDE (ErrorCount);
-
-
-CREATE TABLE IF NOT EXISTS NQueue.WorkItem(
-	WorkItemId serial,
-	IsIngested boolean NOT NULL,
-	Url text NOT NULL,
-	DebugInfo text NULL,
-	CreatedAt timestamp with time zone NOT NULL,
-	LastAttemptedAt timestamp with time zone NULL,
-	QueueName varchar(50) NOT NULL,
-	CONSTRAINT PK_WorkItem PRIMARY KEY (WorkItemId)
-);
-
-
-CREATE UNIQUE INDEX IF NOT EXISTS IX_NQueue_WorkItem_IsIngested_QueueName
-ON NQueue.WorkItem (IsIngested, QueueName, WorkItemId)
-INCLUDE (CreatedAt);
-
-
-CREATE TABLE IF NOT EXISTS NQueue.WorkItemCompleted(
-	WorkItemId int NOT NULL,
-	Url varchar(2000) NOT NULL,
-	DebugInfo varchar(1000) NULL,
-	CreatedAt timestamp with time zone NOT NULL,
-	LastAttemptedAt timestamp with time zone NULL,
-	CompletedAt timestamp with time zone NOT NULL,
-	QueueName varchar(50) NOT NULL,
-	CONSTRAINT PK_WorkItemCompleted PRIMARY KEY (WorkItemId)
-);
-
-
-CREATE UNIQUE INDEX IF NOT EXISTS IX_NQueue_WorkItemCompleted_IsIngested_QueueName
-ON NQueue.WorkItemCompleted (CompletedAt);
-
-
-ALTER TABLE NQueue.Queue DROP CONSTRAINT IF EXISTS FK_Queue_WorkItem_NextWorkItemId;
-ALTER TABLE NQueue.Queue ADD CONSTRAINT FK_Queue_WorkItem_NextWorkItemId FOREIGN KEY(NextWorkItemId)
-REFERENCES NQueue.WorkItem (WorkItemId);
 
 
 
@@ -143,7 +80,8 @@ begin
             CreatedAt,
             LastAttemptedAt,
             QueueName,
-            pNow AS CompletedAt
+            pNow AS CompletedAt,
+			Internal
     )
     INSERT INTO NQueue.WorkItemCompleted
                (WorkItemId
@@ -152,20 +90,27 @@ begin
                ,CreatedAt
                ,LastAttemptedAt
                ,QueueName
-               ,CompletedAt)
+               ,CompletedAt
+               ,Internal)
     SELECT * FROM del_cte a;
 
 end; $$;
 
 
-
+DROP PROCEDURE IF EXISTS NQueue.EnqueueWorkItem(
+	pUrl NQueue.WorkItem.Url%TYPE,
+	pQueueName NQueue.WorkItem.QueueName%TYPE,
+	pDebugInfo NQueue.WorkItem.DebugInfo%TYPE,
+	pNow timestamp with time zone,
+	pDuplicateProtection boolean);
 
 CREATE OR REPLACE PROCEDURE NQueue.EnqueueWorkItem (
 	pUrl NQueue.WorkItem.Url%TYPE,
 	pQueueName NQueue.WorkItem.QueueName%TYPE default NULL,
 	pDebugInfo NQueue.WorkItem.DebugInfo%TYPE default NULL,
 	pNow timestamp with time zone default NULL,
-	pDuplicateProtection boolean default NULL
+	pDuplicateProtection boolean default NULL,
+	pInternal text default NULL
 )
 language plpgsql
 as $$
@@ -217,8 +162,8 @@ begin
 	END IF;
 
 
-	INSERT INTO NQueue.WorkItem (Url, DebugInfo, CreatedAt, QueueName, IsIngested)
-	VALUES (pUrl, pDebugInfo, pNow, pQueueName, FALSE);
+	INSERT INTO NQueue.WorkItem (Url, DebugInfo, CreatedAt, QueueName, IsIngested, Internal)
+	VALUES (pUrl, pDebugInfo, pNow, pQueueName, FALSE, pInternal::jsonb);
 
 END; $$;
 
@@ -250,11 +195,12 @@ begin
 end; $$;
 
 
+DROP FUNCTION IF EXISTS NQueue.NextWorkItem;
 
 
 CREATE OR REPLACE FUNCTION NQueue.NextWorkItem (
 	pNow timestamp with time zone = NULL
-) RETURNS TABLE(WorkItemId NQueue.WorkItem.WorkItemID%TYPE, Url NQueue.WorkItem.Url%TYPE)
+) RETURNS TABLE(WorkItemId NQueue.WorkItem.WorkItemID%TYPE, Url NQueue.WorkItem.Url%TYPE, Internal NQueue.WorkItem.Internal%TYPE)
 as $$
 declare
 	vQueueID NQueue.WorkItem.WorkItemID%TYPE;
@@ -328,7 +274,7 @@ begin
 	END IF;
 
 	return query
-	SELECT r.WorkItemId, r.Url
+	SELECT r.WorkItemId, r.Url, r.Internal
 		FROM NQueue.WorkItem r
 		WHERE r.WorkItemId = vWorkItemID;
 
@@ -383,30 +329,26 @@ begin
 			,DebugInfo
 			,CreatedAt
 			,QueueName
-			,IsIngested)
+			,IsIngested
+			,Internal)
      SELECT
 		   c.Url,
 		   c.DebugInfo,
 		   pNow,
 		   c.QueueName,
-		   FALSE
+		   FALSE,
+		   NULL
 	FROM NQueue.WorkItemCompleted c
 	WHERE c.WorkItemId = pWorkItemID;
 
 end; $$
 
-";
-            
-            
-            
-
-	        await AbstractWorkItemDb.ExecuteNonQuery(tran, sql);
-            
-
-
-
-        }
-
+        ";
         
+        
+        await AbstractWorkItemDb.ExecuteNonQuery(tran, sql);
     }
+    
+    
+    
 }

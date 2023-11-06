@@ -20,7 +20,7 @@ end; $$");
             
             var currentVersion = 0;
 
-            while (currentVersion != 1)
+            while (currentVersion != 2)
             {
                 
                 var dbObjects = await AbstractWorkItemDb.ExecuteReader(
@@ -30,9 +30,11 @@ end; $$");
                     UNION
                     select 'table' AS type, t.TABLE_NAME FROM INFORMATION_SCHEMA.TABLES t WHERE t.TABLE_SCHEMA = 'nqueue'
                     UNION
-                    select 'routine' AS type, r.ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'nqueue';
+                    select 'routine' AS type, r.ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'nqueue'
+                    UNION
+                    select 'column' AS type,  c.table_name::text || '.' || c.column_name::text AS column_name FROM INFORMATION_SCHEMA.COLUMNS c WHERE c.TABLE_SCHEMA = 'nqueue';
                     ", 
-                        reader => new PostgresSchemaInfo(
+                        reader => new DbSchemaInfo(
                         reader.GetString(0),
                         reader.GetString(1)
                     )
@@ -45,7 +47,11 @@ end; $$");
 
                     currentVersion = 0;
                 }
-                else if (new PostgresDbUpgrader01().IsMyVersion(dbObjects))
+                else if (DbSchemaInfo.IsVersion02(dbObjects))
+                {
+                    currentVersion = 2;
+                }
+                else if (DbSchemaInfo.IsVersion01(dbObjects))
                 {
                     currentVersion = 1;
                 }
@@ -58,6 +64,10 @@ end; $$");
                 if (currentVersion == 0)
                 {
                     await new PostgresDbUpgrader01().Upgrade(tran);
+                }
+                if (currentVersion == 1)
+                {
+                    await new PostgresDbUpgrader02().Upgrade(tran);
                 }
             }
 

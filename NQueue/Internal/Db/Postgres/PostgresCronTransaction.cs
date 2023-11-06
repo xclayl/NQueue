@@ -37,7 +37,8 @@ namespace NQueue.Internal.Db.Postgres
                 SqlParameter(queueName),
                 SqlParameter(debugInfo),
                 SqlParameter(NowUtc),
-                SqlParameter(duplicateProtection)
+                SqlParameter(duplicateProtection),
+                SqlParameter(null)
             );
         }
 

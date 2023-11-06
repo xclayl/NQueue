@@ -1,95 +1,28 @@
 ﻿using System.Data.Common;
 using System.Threading.Tasks;
 
-namespace NQueue.Internal.Db.SqlServer.DbMigrations
+namespace NQueue.Internal.Db.SqlServer.DbMigrations;
+
+internal class SqlServerDbUpgrader02 : SqlServerAbstractDbUpgrader
 {
-    internal class SqlServerDbUpgrader01 : SqlServerAbstractDbUpgrader
+    public async ValueTask Upgrade(DbTransaction tran)
     {
-        public async ValueTask Upgrade(DbTransaction tran)
-        {
-            var sql = @"
+        var sql = @"
+IF COL_LENGTH('NQueue.WorkItem', 'Internal') IS NULL
+BEGIN
+    ALTER TABLE NQueue.WorkItem ADD [Internal] NVARCHAR(MAX) NULL;
+END
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE [name] = 'NQueue') EXEC ('CREATE SCHEMA [NQueue]');
+IF COL_LENGTH('NQueue.WorkItemCompleted', 'Internal') IS NULL
+BEGIN
+    ALTER TABLE NQueue.WorkItemCompleted ADD [Internal] NVARCHAR(MAX) NULL;
+END
+
+
 GO
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-CREATE TABLE [NQueue].[CronJob](
-	[CronJobId] [int] IDENTITY(1,1) NOT NULL,
-	[Active] [bit] NOT NULL,
-	[LastRanAt] [datetimeoffset](7) NOT NULL,
-	[CronJobName] [nvarchar](50) NOT NULL,
- CONSTRAINT [PK_CronJob] PRIMARY KEY CLUSTERED 
-(
-	[CronJobId] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY],
- CONSTRAINT [AK_CronJob_CronJobName] UNIQUE NONCLUSTERED 
-(
-	[CronJobName] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY]
-GO
-CREATE TABLE [NQueue].[Queue](
-	[QueueId] [int] IDENTITY(1,1) NOT NULL,
-	[Name] [nvarchar](50) NOT NULL,
-	[NextWorkItemId] [int] NOT NULL,
-	[ErrorCount] [int] NOT NULL,
-	[LockedUntil] [datetimeoffset](7) NOT NULL,
- CONSTRAINT [PK_Queue] PRIMARY KEY CLUSTERED 
-(
-	[QueueId] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY],
- CONSTRAINT [AK_Queue_Name] UNIQUE NONCLUSTERED 
-(
-	[Name] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY]
-GO
-CREATE UNIQUE NONCLUSTERED INDEX [IX_NQueue_Queue_LockedUntil_NextWorkItemId]
-ON [NQueue].[Queue] ([LockedUntil],[NextWorkItemId],[QueueId])
-INCLUDE (ErrorCount)
-GO
-CREATE TABLE [NQueue].[WorkItem](
-	[WorkItemId] [int] IDENTITY(1,1) NOT NULL,
-	[IsIngested] [bit] NOT NULL,
-	[Url] [nvarchar](max) NOT NULL,
-	[DebugInfo] [nvarchar](max) NULL,
-	[CreatedAt] [datetimeoffset](7) NOT NULL,
-	[LastAttemptedAt] [datetimeoffset](7) NULL,
-	[QueueName] [nvarchar](50) NOT NULL,
- CONSTRAINT [PK_WorkItem] PRIMARY KEY CLUSTERED 
-(
-	[WorkItemId] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
-GO
-CREATE UNIQUE NONCLUSTERED INDEX [IX_NQueue_WorkItem_IsIngested_QueueName]
-ON [NQueue].[WorkItem] ([IsIngested], [QueueName], WorkItemId)
-INCLUDE (CreatedAt)
-GO
-CREATE TABLE [NQueue].[WorkItemCompleted](
-	[WorkItemId] [int] NOT NULL,
-	[Url] [nvarchar](2000) NOT NULL,
-	[DebugInfo] [nvarchar](1000) NULL,
-	[CreatedAt] [datetimeoffset](7) NOT NULL,
-	[LastAttemptedAt] [datetimeoffset](7) NULL,
-	[CompletedAt] [datetimeoffset](7) NOT NULL,
-	[QueueName] [nvarchar](50) NOT NULL,
- CONSTRAINT [PK_WorkItemCompleted] PRIMARY KEY CLUSTERED 
-(
-	[WorkItemId] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
-) ON [PRIMARY]
-GO
-CREATE UNIQUE NONCLUSTERED INDEX [IX_NQueue_WorkItemCompleted_IsIngested_QueueName]
-ON [NQueue].[WorkItemCompleted] ([CompletedAt])
-GO
-ALTER TABLE [NQueue].[Queue]  WITH CHECK ADD  CONSTRAINT [FK_Queue_WorkItem_NextWorkItemId] FOREIGN KEY([NextWorkItemId])
-REFERENCES [NQueue].[WorkItem] ([WorkItemId])
-GO
-ALTER TABLE [NQueue].[Queue] CHECK CONSTRAINT [FK_Queue_WorkItem_NextWorkItemId]
-GO
+
+
+
 CREATE OR ALTER PROCEDURE [NQueue].[CompleteWorkItem]
 	@WorkItemID INT,
 	@Now datetimeoffset(7) = NULL
@@ -170,7 +103,8 @@ BEGIN
 				   ,[CreatedAt]
 				   ,[LastAttemptedAt]
 				   ,[QueueName]
-				   ,[CompletedAt])
+				   ,[CompletedAt]
+				   ,Internal)
 		SELECT * FROM (
 			 DELETE FROM [NQueue].WorkItem
 			 OUTPUT
@@ -180,7 +114,8 @@ BEGIN
 				deleted.[CreatedAt],
 				deleted.[LastAttemptedAt],
 				deleted.[QueueName],
-				@Now AS [CompletedAt]
+				@Now AS [CompletedAt],
+				deleted.[Internal]
 			WHERE WorkItemId = @WorkItemID) a
 
 
@@ -216,7 +151,8 @@ CREATE OR ALTER PROCEDURE [NQueue].[EnqueueWorkItem]
 	@QueueName nvarchar(50) = NULL,
 	@DebugInfo nvarchar(1000) = NULL,
 	@Now datetimeoffset(7) = NULL,
-	@DuplicateProtection BIT = NULL
+	@DuplicateProtection BIT = NULL,
+	@Internal NVARCHAR(MAX) = NULL
 AS
 BEGIN
 	IF @Now IS NULL
@@ -267,8 +203,8 @@ BEGIN
 	END;
 
 
-	INSERT INTO [NQueue].WorkItem ([Url], DebugInfo, CreatedAt, QueueName, IsIngested)
-	VALUES (@Url, @DebugInfo, @Now, @QueueName, 0)
+	INSERT INTO [NQueue].WorkItem ([Url], DebugInfo, CreatedAt, QueueName, IsIngested, Internal)
+	VALUES (@Url, @DebugInfo, @Now, @QueueName, 0, @Internal)
 
 END	    
 GO
@@ -384,7 +320,7 @@ BEGIN
 			WHERE ur.QueueId = @QueueID;
 		END;
 
-		SELECT r.WorkItemId, r.[Url]
+		SELECT r.WorkItemId, r.[Url], r.[Internal]
 			FROM [NQueue].WorkItem r	
 			WHERE r.WorkItemId = @WorkItemID;
 
@@ -443,35 +379,31 @@ BEGIN
 			,[DebugInfo]
 			,[CreatedAt]
 			,[QueueName]
-			,IsIngested)
+			,IsIngested
+			,Internal)
      SELECT
 		   c.Url,
 		   c.DebugInfo,
 		   @Now,
 		   c.QueueName,
-		   0
+		   0,
+		   NULL
 	FROM [NQueue].WorkItemCompleted c 
 	WHERE c.WorkItemId = @WorkItemID;
 
 END
+        ";
+        
+        
+        var batches = SplitIntoBatches(sql);
 
-";
-            
-            
-            
-            var batches = SplitIntoBatches(sql);
-
-            foreach (var batch in batches)
-            {
-	            await AbstractWorkItemDb.ExecuteNonQuery(tran, batch);
-            }
-
-
-
+        foreach (var batch in batches)
+        {
+            await AbstractWorkItemDb.ExecuteNonQuery(tran, batch);
         }
-
-
-        
-        
     }
+    
+    
+    
+    
 }

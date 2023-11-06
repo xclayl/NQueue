@@ -68,7 +68,7 @@ namespace NQueue.Internal.Db.SqlServer
         {
             var rowEnumerable = ExecuteReader(
                 _tran, 
-                "SELECT CAST(LastRanAt AT TIME ZONE 'UTC' AS DATETIME) AS LastRanAtUtc, Active FROM [NQueue].CronJob cj WITH (UPDLOCK,HOLDLOCK) WHERE CronJobId=@CronJobId",
+                "SELECT CONVERT(datetime, switchoffset ([LastRanAt], '+00:00')) AS LastRanAtUtc, Active FROM [NQueue].CronJob cj WITH (UPDLOCK,HOLDLOCK) WHERE CronJobId=@CronJobId",
                 reader => new
                 {
                     LastRanAt = new DateTimeOffset(reader.GetDateTime(0), TimeSpan.Zero),

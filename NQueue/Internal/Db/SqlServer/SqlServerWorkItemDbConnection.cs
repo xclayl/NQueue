@@ -30,6 +30,7 @@ namespace NQueue.Internal.Db.SqlServer
         }
         public async ValueTask<ICronTransaction> BeginTran()
         {
+            await EnsureDbMigrationRuns();
             var conn = await _config.OpenDbConnection();
             return new SqlServerCronTransaction(await conn.BeginTransactionAsync(), conn, _config.TimeZone);
         }
@@ -60,8 +61,9 @@ namespace NQueue.Internal.Db.SqlServer
         
         public async ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState()
         {
+            await EnsureDbMigrationRuns();
             var rows = ExecuteReader(
-                "SELECT [CronJobId], [CronJobName], CAST(LastRanAt AT TIME ZONE 'UTC' AS DATETIME) AS LastRanAtUtc FROM [NQueue].CronJob",
+                "SELECT [CronJobId], [CronJobName], CONVERT(datetime, switchoffset ([LastRanAt], '+00:00')) AS LastRanAtUtc FROM [NQueue].CronJob",
                 await _config.OpenDbConnection(),
                 reader => new CronJobInfo(
                     reader.GetInt32(0),
@@ -75,6 +77,7 @@ namespace NQueue.Internal.Db.SqlServer
 
         public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()
         {
+            await EnsureDbMigrationRuns();
             var rows = ExecuteReader(
                 "SELECT COUNT(*) FROM [NQueue].[Queue] WHERE ErrorCount >= 5",
                 await _config.OpenDbConnection(),

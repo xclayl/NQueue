@@ -53,7 +53,7 @@ namespace NQueue.Sample.Controllers
         {
             var a = _server.Features.Get<IServerAddressesFeature>().Addresses.ToList();
             
-            await _client.Enqueue(await _client.Localhost("NoOp"));
+            await _client.Enqueue(await _client.Localhost("api/NQueue/NoOp"));
             return Ok("Enqueue Done");
         }
 
@@ -64,7 +64,7 @@ namespace NQueue.Sample.Controllers
             await using var cnn = await dataSource.OpenConnectionAsync();
             await using var tran = await cnn.BeginTransactionAsync();
             
-            await _client.Enqueue(await _client.Localhost("NoOp"), tran: tran);
+            await _client.Enqueue(await _client.Localhost("api/NQueue/NoOp"), tran: tran);
             await tran.CommitAsync();
             return Ok("Enqueue Done");
         }

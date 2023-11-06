@@ -25,7 +25,7 @@ END
             
             var currentVersion = 0;
 
-            while (currentVersion != 1)
+            while (currentVersion != 2)
             {
                 
                 var dbObjects = await AbstractWorkItemDb.ExecuteReader(
@@ -35,8 +35,10 @@ END
                     UNION
                     select 'table' AS [type], t.TABLE_NAME FROM INFORMATION_SCHEMA.TABLES t WHERE t.TABLE_SCHEMA = 'NQueue'
                     UNION
-                    select 'routine' AS [type], r.ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'NQueue';
-                    ", reader => new SqlServerSchemaInfo(
+                    select 'routine' AS [type], r.ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'NQueue'
+                    UNION
+                    select 'column' AS type, c.TABLE_NAME + '.' + c.COLUMN_NAME AS column_name FROM INFORMATION_SCHEMA.COLUMNS c WHERE c.TABLE_SCHEMA = 'nqueue';
+                    ", reader => new DbSchemaInfo(
                         reader.GetString(0),
                         reader.GetString(1)
                     )
@@ -49,7 +51,11 @@ END
 
                     currentVersion = 0;
                 }
-                else if (new SqlServerDbUpgrader01().IsMyVersion(dbObjects))
+                else if (DbSchemaInfo.IsVersion02(dbObjects))
+                {
+                    currentVersion = 2;
+                }
+                else if (DbSchemaInfo.IsVersion01(dbObjects))
                 {
                     currentVersion = 1;
                 }
@@ -62,6 +68,10 @@ END
                 if (currentVersion == 0)
                 {
                     await new SqlServerDbUpgrader01().Upgrade(tran);
+                }
+                if (currentVersion == 1)
+                {
+                    await new SqlServerDbUpgrader02().Upgrade(tran);
                 }
             }
 

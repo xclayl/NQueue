@@ -29,6 +29,7 @@ namespace NQueue.Internal.Db.Postgres
 
         public async ValueTask<ICronTransaction> BeginTran()
         {
+            await EnsureDbMigrationRuns();
             var conn = await _config.OpenDbConnection();
             return new PostgresCronTransaction(await conn.BeginTransactionAsync(), conn, _config.TimeZone);
         }
@@ -58,6 +59,7 @@ namespace NQueue.Internal.Db.Postgres
         
         public async ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState()
         {
+            await EnsureDbMigrationRuns();
             var rows = ExecuteReader(
                 "SELECT CronJobId, CronJobName, LastRanAt FROM NQueue.CronJob",
                 await _config.OpenDbConnection(),
@@ -73,6 +75,7 @@ namespace NQueue.Internal.Db.Postgres
 
         public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()
         {
+            await EnsureDbMigrationRuns();
             var rows = ExecuteReader(
                 "SELECT COUNT(*) FROM NQueue.Queue WHERE ErrorCount >= 5",
                 await _config.OpenDbConnection(),

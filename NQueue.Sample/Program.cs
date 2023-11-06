@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -25,29 +26,29 @@ builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 builder.Services.AddNQueueHostedService((s, config) =>
 {
-    // config.CreateDbConnection = () =>
-    // {
-    //     var cnnBuilder = new SqlConnectionStringBuilder
-    //     {
-    //         DataSource = "localhost,15533",
-    //         InitialCatalog = "NQueueSample",
-    //         UserID = "NQueueUser",
-    //         Password = "ihSH3jqeVb7giIgOkohX"
-    //     };
-    //     cnnBuilder.Encrypt = !cnnBuilder.DataSource.StartsWith("localhost");
-    //     return new ValueTask<DbConnection>(new SqlConnection(cnnBuilder.ToString()));
-    // };
-
-    var cnnBuilder = new NpgsqlConnectionStringBuilder()
+    config.CreateDbConnection = () =>
     {
-        Host = "localhost",
-        Database = "NQueueSample",
-        Username = "nqueueuser",
-        Password = "ihSH3jqeVb7giIgOkohX",
-        Port = 15532
+        var cnnBuilder = new SqlConnectionStringBuilder
+        {
+            DataSource = "localhost,15533",
+            InitialCatalog = "NQueueSample",
+            UserID = "NQueueUser",
+            Password = "ihSH3jqeVb7giIgOkohX"
+        };
+        cnnBuilder.Encrypt = !cnnBuilder.DataSource.StartsWith("localhost");
+        return new ValueTask<DbConnection>(new SqlConnection(cnnBuilder.ToString()));
     };
-    cnnBuilder.SslMode = cnnBuilder.Host == "localhost" ? SslMode.Disable : SslMode.VerifyFull;
-    config.CreateDbConnection = () => new ValueTask<DbConnection>(new NpgsqlConnection(cnnBuilder.ToString()));
+
+    // var cnnBuilder = new NpgsqlConnectionStringBuilder()
+    // {
+    //     Host = "localhost",
+    //     Database = "NQueueSample",
+    //     Username = "nqueueuser",
+    //     Password = "ihSH3jqeVb7giIgOkohX",
+    //     Port = 15532
+    // };
+    // cnnBuilder.SslMode = cnnBuilder.Host == "localhost" ? SslMode.Disable : SslMode.VerifyFull;
+    // config.CreateDbConnection = () => new ValueTask<DbConnection>(new NpgsqlConnection(cnnBuilder.ToString()));
 
     config.CronJobs = new[]
     {

@@ -77,6 +77,8 @@ namespace NQueue.Internal.Db.Postgres
         
         public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
         {
+            var internalJson = "{\"a\":3}";
+            
             if (tran == null)
                 await ExecuteProcedure(
                     "nqueue.EnqueueWorkItem",
@@ -85,7 +87,8 @@ namespace NQueue.Internal.Db.Postgres
                     SqlParameter(queueName),
                     SqlParameter(debugInfo),
                     SqlParameter(NowUtc),
-                    SqlParameter(duplicateProtection)
+                    SqlParameter(duplicateProtection),
+                    SqlParameter(internalJson)
                 );
             else
                 await ExecuteProcedure(
@@ -95,7 +98,8 @@ namespace NQueue.Internal.Db.Postgres
                     SqlParameter(queueName),
                     SqlParameter(debugInfo),
                     SqlParameter(NowUtc),
-                    SqlParameter(duplicateProtection)
+                    SqlParameter(duplicateProtection),
+                    SqlParameter(internalJson)
                 );
         }
 
