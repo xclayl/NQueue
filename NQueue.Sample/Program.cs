@@ -14,6 +14,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using NQueue;
+using NQueue.Sample;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -59,6 +63,28 @@ builder.Services.AddNQueueHostedService((s, config) =>
                 
     return default;
 });
+
+var resourceBuilder = ResourceBuilder.CreateDefault()
+    .AddService(MyActivitySource.ActivitySource.Name, MyActivitySource.ActivitySource.Version)
+    .AddTelemetrySdk();
+
+builder.Logging
+    .ClearProviders()
+    .AddOpenTelemetry(b =>
+    {
+        b.SetResourceBuilder(resourceBuilder)
+            .AddConsoleExporter();
+    });
+
+builder.Services.AddOpenTelemetry()
+    .WithTracing(b =>
+    {
+        b
+            .AddSource(MyActivitySource.ActivitySource.Name)
+            .SetResourceBuilder(resourceBuilder)
+            .AddAspNetCoreInstrumentation()
+            .AddConsoleExporter();
+    });
 
 
 

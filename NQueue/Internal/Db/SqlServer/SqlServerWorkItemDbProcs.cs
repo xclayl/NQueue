@@ -23,8 +23,9 @@ namespace NQueue.Internal.Db.SqlServer
 
         public async ValueTask<WorkItemInfo?> NextWorkItem()
         {
+            await using var cnn = await _config.OpenDbConnection();
             var rows = ExecuteReader("EXEC [NQueue].[NextWorkItem] @Now=@Now",
-                await _config.OpenDbConnection(),
+                cnn,
                 reader => new WorkItemInfo(
                     reader.GetInt32(reader.GetOrdinal("WorkItemId")),
                     reader.GetString(reader.GetOrdinal("Url")),
@@ -41,9 +42,10 @@ namespace NQueue.Internal.Db.SqlServer
 
         public async ValueTask CompleteWorkItem(int workItemId)
         {
+            await using var cnn = await _config.OpenDbConnection();
             await ExecuteNonQuery(
                 "EXEC [NQueue].[CompleteWorkItem] @WorkItemID=@WorkItemID, @Now=@Now",
-                await _config.OpenDbConnection(),
+                cnn,
                 SqlParameter("@WorkItemID", workItemId),
                 SqlParameter("@Now", Now)
             );
@@ -51,9 +53,10 @@ namespace NQueue.Internal.Db.SqlServer
 
         public async ValueTask FailWorkItem(int workItemId)
         {
+            await using var cnn = await _config.OpenDbConnection();
             await ExecuteNonQuery(
                 "EXEC [NQueue].[FailWorkItem] @WorkItemID=@WorkItemID, @Now=@Now",
-                await _config.OpenDbConnection(),
+                cnn,
                 SqlParameter("@WorkItemID", workItemId),
                 SqlParameter("@Now", Now)
             );
@@ -70,9 +73,10 @@ namespace NQueue.Internal.Db.SqlServer
 
         public async ValueTask PurgeWorkItems()
         {
+            await using var cnn = await _config.OpenDbConnection();
             await ExecuteNonQuery(
                 "EXEC [NQueue].[PurgeWorkItems] @Now=@Now",
-                await _config.OpenDbConnection(),
+                cnn,
                 SqlParameter("@Now", Now)
             );
         }
@@ -81,10 +85,12 @@ namespace NQueue.Internal.Db.SqlServer
 
         public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson)
         {
-            if (tran == null) 
+            if (tran == null)
+            {
+                await using var cnn = await _config.OpenDbConnection();
                 await ExecuteNonQuery(
                     "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection, @Internal=@Internal",
-                    await _config.OpenDbConnection(),
+                    cnn,
                     SqlParameter("@QueueName", queueName),
                     SqlParameter("@Url", url.ToString()),
                     SqlParameter("@DebugInfo", debugInfo),
@@ -92,6 +98,7 @@ namespace NQueue.Internal.Db.SqlServer
                     SqlParameter("@DuplicateProtection", duplicateProtection),
                     SqlParameter("@Internal", internalJson)
                 );
+            }
             else
                 await ExecuteNonQuery(
                     tran,

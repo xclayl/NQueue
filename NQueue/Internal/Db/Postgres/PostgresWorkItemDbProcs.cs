@@ -20,8 +20,9 @@ namespace NQueue.Internal.Db.Postgres
         
         public async ValueTask<WorkItemInfo?> NextWorkItem()
         {
+            await using var cnn = await _config.OpenDbConnection();
             var rows = ExecuteReader("SELECT * FROM nqueue.NextWorkItem($1)",
-                await _config.OpenDbConnection(),
+                cnn,
                 reader => new WorkItemInfo(
                     reader.GetInt32(reader.GetOrdinal("WorkItemId")),
                     reader.GetString(reader.GetOrdinal("Url")),
@@ -38,9 +39,10 @@ namespace NQueue.Internal.Db.Postgres
 
         public async ValueTask CompleteWorkItem(int workItemId)
         {
+            await using var cnn = await _config.OpenDbConnection();
             await ExecuteProcedure(
                 "nqueue.CompleteWorkItem",
-                await _config.OpenDbConnection(),
+                cnn,
                 SqlParameter(workItemId),
                 SqlParameter(NowUtc)
             );
@@ -48,9 +50,10 @@ namespace NQueue.Internal.Db.Postgres
 
         public async ValueTask FailWorkItem(int workItemId)
         {
+            await using var cnn = await _config.OpenDbConnection();
             await ExecuteProcedure(
                 "nqueue.FailWorkItem",
-                await _config.OpenDbConnection(),
+                cnn,
                 SqlParameter(workItemId),
                 SqlParameter(NowUtc)
             );
@@ -67,9 +70,10 @@ namespace NQueue.Internal.Db.Postgres
 
         public async ValueTask PurgeWorkItems()
         {
+            await using var cnn = await _config.OpenDbConnection();
             await ExecuteProcedure(
                 "nqueue.PurgeWorkItems",
-                await _config.OpenDbConnection(),
+                cnn,
                 SqlParameter(NowUtc)
             );
         }
@@ -79,9 +83,11 @@ namespace NQueue.Internal.Db.Postgres
         public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson)
         {
             if (tran == null)
+            {
+                await using var cnn = await _config.OpenDbConnection();
                 await ExecuteProcedure(
                     "nqueue.EnqueueWorkItem",
-                    await _config.OpenDbConnection(),
+                    cnn,
                     SqlParameter(url.ToString()),
                     SqlParameter(queueName),
                     SqlParameter(debugInfo),
@@ -89,6 +95,7 @@ namespace NQueue.Internal.Db.Postgres
                     SqlParameter(duplicateProtection),
                     SqlParameter(internalJson)
                 );
+            }
             else
                 await ExecuteProcedure(
                     tran,

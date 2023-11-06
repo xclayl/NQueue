@@ -62,9 +62,10 @@ namespace NQueue.Internal.Db.SqlServer
         public async ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState()
         {
             await EnsureDbMigrationRuns();
+            await using var cnn = await _config.OpenDbConnection();
             var rows = ExecuteReader(
                 "SELECT [CronJobId], [CronJobName], CONVERT(datetime, switchoffset ([LastRanAt], '+00:00')) AS LastRanAtUtc FROM [NQueue].CronJob",
-                await _config.OpenDbConnection(),
+                cnn,
                 reader => new CronJobInfo(
                     reader.GetInt32(0),
                     reader.GetString(1),
@@ -78,9 +79,10 @@ namespace NQueue.Internal.Db.SqlServer
         public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()
         {
             await EnsureDbMigrationRuns();
+            await using var cnn = await _config.OpenDbConnection();
             var rows = ExecuteReader(
                 "SELECT COUNT(*) FROM [NQueue].[Queue] WHERE ErrorCount >= 5",
-                await _config.OpenDbConnection(),
+                cnn,
                 reader => reader.GetInt32(0));
 
             var count = await rows.SingleAsync();
