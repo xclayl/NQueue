@@ -16,7 +16,7 @@ namespace NQueue.Internal.Db
 
     internal interface IWorkItemDbProcs
     {
-        ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection);
+        ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson);
         ValueTask<WorkItemInfo?> NextWorkItem();
         ValueTask CompleteWorkItem(int workItemId);
         ValueTask FailWorkItem(int workItemId);

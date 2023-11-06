@@ -86,18 +86,6 @@ namespace NQueue.Internal
         }
 
 
-        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
-            bool duplicatePrevention)
-        {
-            var config = await _configFactory.GetConfig();
-            var conn = await config.GetWorkItemDbConnection();
-
-            var query = await conn.Get();
-            await query.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicatePrevention);
-        }
-
-
-
         public void PollNow()
         {
             var workers = _workers;

@@ -17,6 +17,7 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
         public string QueueName { get; init; }
         public string? DebugInfo { get; init; }
         public bool IsIngested { get; init; }
+        public string? Internal { get; init; }
     }
 
     private class Queue
@@ -35,7 +36,7 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
     private int _nextId = 23;
         
 
-    public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
+    public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson)
     {
         if (tran != null)
             throw new Exception("The in-memory NQueue implementation is not compatible with DB transactions.");
@@ -58,6 +59,7 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
             QueueName = queueName,
             DebugInfo = debugInfo,
             IsIngested = false,
+            Internal = internalJson,
         });
             
                 
@@ -111,7 +113,7 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
 
         queue.LockedUntil = now.AddHours(1);
 
-        return new WorkItemInfo(next.WorkItemId, next.Url.AbsoluteUri);
+        return new WorkItemInfo(next.WorkItemId, next.Url.AbsoluteUri, next.Internal);
     }
 
     public async ValueTask CompleteWorkItem(int workItemId)

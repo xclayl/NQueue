@@ -24,7 +24,8 @@ namespace NQueue.Internal.Db.Postgres
                 await _config.OpenDbConnection(),
                 reader => new WorkItemInfo(
                     reader.GetInt32(reader.GetOrdinal("WorkItemId")),
-                    reader.GetString(reader.GetOrdinal("Url"))
+                    reader.GetString(reader.GetOrdinal("Url")),
+                    !reader.IsDBNull(reader.GetOrdinal("Internal")) ? reader.GetString(reader.GetOrdinal("Internal")) : null
                 ),
                 SqlParameter(NowUtc)
             );
@@ -75,10 +76,8 @@ namespace NQueue.Internal.Db.Postgres
 
         
         
-        public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
+        public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson)
         {
-            var internalJson = "{\"a\":3}";
-            
             if (tran == null)
                 await ExecuteProcedure(
                     "nqueue.EnqueueWorkItem",

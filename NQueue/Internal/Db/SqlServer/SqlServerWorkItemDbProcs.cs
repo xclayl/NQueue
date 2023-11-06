@@ -27,7 +27,8 @@ namespace NQueue.Internal.Db.SqlServer
                 await _config.OpenDbConnection(),
                 reader => new WorkItemInfo(
                     reader.GetInt32(reader.GetOrdinal("WorkItemId")),
-                    reader.GetString(reader.GetOrdinal("Url"))
+                    reader.GetString(reader.GetOrdinal("Url")),
+                    !reader.IsDBNull(reader.GetOrdinal("Internal")) ? reader.GetString(reader.GetOrdinal("Internal")) : null
                 ),
                 SqlParameter("@Now", Now)
             );
@@ -78,27 +79,29 @@ namespace NQueue.Internal.Db.SqlServer
 
 
 
-        public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection)
+        public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson)
         {
             if (tran == null) 
                 await ExecuteNonQuery(
-                    "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection",
+                    "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection, @Internal=@Internal",
                     await _config.OpenDbConnection(),
                     SqlParameter("@QueueName", queueName),
                     SqlParameter("@Url", url.ToString()),
                     SqlParameter("@DebugInfo", debugInfo),
                     SqlParameter("@Now", Now),
-                    SqlParameter("@DuplicateProtection", duplicateProtection)
+                    SqlParameter("@DuplicateProtection", duplicateProtection),
+                    SqlParameter("@Internal", internalJson)
                 );
             else
                 await ExecuteNonQuery(
                     tran,
-                    "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection",
+                    "EXEC [NQueue].[EnqueueWorkItem] @QueueName=@QueueName, @Url=@Url, @DebugInfo=@DebugInfo, @Now=@Now, @DuplicateProtection=@DuplicateProtection, @Internal=@Internal",
                     SqlParameter("@QueueName", queueName),
                     SqlParameter("@Url", url.ToString()),
                     SqlParameter("@DebugInfo", debugInfo),
                     SqlParameter("@Now", Now),
-                    SqlParameter("@DuplicateProtection", duplicateProtection)
+                    SqlParameter("@DuplicateProtection", duplicateProtection),
+                    SqlParameter("@Internal", internalJson)
                 );
         }
 

@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Net.Http;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NQueue.Internal.Db;
+using NQueue.Internal.Model;
 
 namespace NQueue.Internal.Workers
 {
@@ -42,13 +45,10 @@ namespace NQueue.Internal.Workers
                 return false;
             }
 
+            using var _ = StartWorkItemActivity(request);
             try
             {
-                // var traceId = Activity.Current?.TraceId.ToString();
-                // var spanId = Activity.Current?.SpanId.ToString();
-                //
-                // new ActivitySource().StartActivity()
-                
+
                 using var httpClient = _httpClientFactory.CreateClient();
 
                 using var httpReq = new HttpRequestMessage();
@@ -77,6 +77,24 @@ namespace NQueue.Internal.Workers
             await query.FailWorkItem(request.WorkItemId);
             logger.Log(LogLevel.Information, "work item faulted");
             return false;
+        }
+
+        private static Activity? StartWorkItemActivity(WorkItemInfo request)
+        {
+            if (request.Internal != null)
+            {
+                var jsonObj = request.Internal.DeserializeAnonymousType(new { otel = new { traceparent = (string?)"", tracestate = (string?)"" } });
+                if (jsonObj?.otel?.traceparent != null)
+                {
+                    if (ActivityContext.TryParse(jsonObj?.otel?.traceparent, jsonObj?.otel?.tracestate,
+                            out ActivityContext context))
+                    {
+                        return NQueueActivitySource.ActivitySource.StartActivity(ActivityKind.Consumer, context);
+                    }
+                }
+            }
+
+            return null;
         }
     }
 }

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Data.Common;
+using System.Diagnostics;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using NQueue.Internal;
 
@@ -81,9 +83,27 @@ myFakeNQueueService.BaseAddress = factory.Server.BaseAddress;
             
             var query = await conn.Get();
             
-            // TODO capture Activity info
 
-            await query.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicatePrevention);
+            using var _ = NQueueActivitySource.ActivitySource.StartActivity(ActivityKind.Producer);
+            
+            string? internalJson = null;
+            if (Activity.Current != null)
+            {
+                Activity.Current.SetIdFormat(ActivityIdFormat.W3C);
+                
+                internalJson = JsonSerializer.Serialize(new
+                {
+                    otel = new
+                    {
+                        traceparent = Activity.Current.Id,
+                        tracestate  = Activity.Current.TraceStateString,
+                    }
+                });
+            }
+
+            
+            
+            await query.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicatePrevention, internalJson);
         }
 
 
