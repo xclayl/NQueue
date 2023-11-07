@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using Npgsql;
 using NQueue;
 using NQueue.Sample;
+using OpenTelemetry.Instrumentation.NQueue;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -80,7 +81,8 @@ builder.Services.AddOpenTelemetry()
     .WithTracing(b =>
     {
         b
-            .AddSource(MyActivitySource.ActivitySource.Name)
+            .AddSource(MyActivitySource.ActivitySource.Name, MyActivitySource.ActivitySource.Version)
+            .AddNQueueSource()
             .SetResourceBuilder(resourceBuilder)
             .AddAspNetCoreInstrumentation()
             .AddConsoleExporter();
@@ -104,14 +106,11 @@ else
 // app.UseHttpsRedirection();
 app.UseStaticFiles();
 
-app.UseRouting();
 
 app.UseAuthorization();
 
-app.UseEndpoints(endpoints =>
-{
-    endpoints.MapRazorPages();
-    endpoints.MapControllers();
-});
+
+app.MapDefaultControllerRoute();
+app.MapRazorPages();
 
 app.Run();

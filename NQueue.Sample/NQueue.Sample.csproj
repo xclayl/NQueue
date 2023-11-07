@@ -6,6 +6,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\NQueue\NQueue.csproj" />
+      <ProjectReference Include="..\NQueue.Extensions.OpenTelemetry\NQueue.Extensions.OpenTelemetry.csproj" />
     </ItemGroup>
 
     <ItemGroup>

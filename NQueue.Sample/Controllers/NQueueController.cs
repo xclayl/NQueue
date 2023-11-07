@@ -51,6 +51,7 @@ namespace NQueue.Sample.Controllers
 
         public async ValueTask<IActionResult> Enqueue()
         {
+            using var _ = MyActivitySource.ActivitySource.StartActivity("hey");
             var a = _server.Features.Get<IServerAddressesFeature>().Addresses.ToList();
             
             await _client.Enqueue(await _client.Localhost("api/NQueue/NoOp"));

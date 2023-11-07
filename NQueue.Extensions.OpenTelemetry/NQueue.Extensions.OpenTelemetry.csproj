@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+
+
+        <PackageVersion>0.0.1-alpha-016</PackageVersion>
+        <Authors>Clay Lenhart</Authors>
+        <Description>Sets up Open Telemetry tracing for NQueue</Description>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageId>NQueue.Extensions.OpenTelemetry</PackageId>
+        <Copyright>Copyright (c) Clay Lenhart 2023</Copyright>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <RepositoryUrl>https://github.com/xclayl/NQueue</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>queuing, message broker, outbox pattern, message bus</PackageTags>
+        <PackageReadmeFile>readme.md</PackageReadmeFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="OpenTelemetry.Api" Version="1.6.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\NQueue\NQueue.csproj" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <None Include="doc\readme.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+    
+    
+</Project>

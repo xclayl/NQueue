@@ -17,6 +17,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{3A402534-C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NQueue.Tests", "NQueue.Tests\NQueue.Tests.csproj", "{782DC77A-A6D1-4BF7-B74D-198EAFD6F3F1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NQueue.Extensions.OpenTelemetry", "NQueue.Extensions.OpenTelemetry\NQueue.Extensions.OpenTelemetry.csproj", "{251B1FF6-AF36-4B8C-A897-B878C1061D9C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,10 @@ Global
 		{782DC77A-A6D1-4BF7-B74D-198EAFD6F3F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{782DC77A-A6D1-4BF7-B74D-198EAFD6F3F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{782DC77A-A6D1-4BF7-B74D-198EAFD6F3F1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{251B1FF6-AF36-4B8C-A897-B878C1061D9C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{251B1FF6-AF36-4B8C-A897-B878C1061D9C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{251B1FF6-AF36-4B8C-A897-B878C1061D9C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{251B1FF6-AF36-4B8C-A897-B878C1061D9C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{3A402534-CC79-439B-931A-DB7245657DC1} = {FEA4FDF9-B61F-411A-918B-68E5C023F18E}
