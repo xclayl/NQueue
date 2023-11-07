@@ -51,6 +51,7 @@ namespace NQueue.Internal.Workers
 
                 using var httpClient = _httpClientFactory.CreateClient();
 
+                httpClient.Timeout = TimeSpan.FromHours(1);
                 using var httpReq = new HttpRequestMessage();
                 httpReq.RequestUri = new Uri(request.Url);
                 httpReq.Method = HttpMethod.Get;
