@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
 
 
-        <PackageVersion>0.0.1-alpha-016</PackageVersion>
+        <PackageVersion>1.0.0</PackageVersion>
         <Authors>Clay Lenhart</Authors>
         <Description>Sets up Open Telemetry tracing for NQueue</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
