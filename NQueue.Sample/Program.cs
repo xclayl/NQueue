@@ -62,7 +62,7 @@ builder.Services.AddNQueueHostedService((s, config) =>
 
     config.QueueRunners = 100;
 
-    config.LocalHttpAddresses = s.GetService<IServer>().Features.Get<IServerAddressesFeature>().Addresses.ToList();
+    config.LocalHttpAddresses = s.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>().Addresses.ToList();
                 
     return default;
 });

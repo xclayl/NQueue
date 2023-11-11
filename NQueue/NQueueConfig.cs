@@ -16,14 +16,43 @@ namespace NQueue
 
     public class NQueueServiceConfig
     {
-        // public bool RunWorkers { get; set; } = true;
+        /// <summary>
+        /// Maximum number of Work Items to be processed in parallel.  0 = disables background processing.
+        /// Feel free to use a ridiculous number, like 1_000_000.
+        /// Default = 1
+        /// </summary>
         public int QueueRunners { get; set; } = 1;
+        /// <summary>
+        /// The amount of time to wait until querying the DB again to look for Work Items.
+        /// If a Work Item was found previously, this is ignored, and NQueue immediately
+        /// queries for another Work Item.
+        /// Default = 30s
+        /// </summary>
         public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(30);
+        /// <summary>
+        /// Allows you to modify the HTTP request.  I've used this to add authentication in the past, but
+        /// you can modify anything you like, even the RequestUri.
+        /// </summary>
         public Func<HttpRequestMessage, ValueTask> ModifyHttpRequest { get; set; } = (_) => ValueTask.CompletedTask;
+        /// <summary>
+        /// Used to create the DB Connection to the database to look for Work Items, or anything else like
+        /// cron job management.
+        /// Default = null (in-memory queues for testing)
+        /// </summary>
         public Func<ValueTask<DbConnection?>> CreateDbConnection { get; set; } = () => ValueTask.FromResult((DbConnection?) null);
+        /// <summary>
+        /// A list of cron jobs which create Work Items on a schedule.
+        /// These will not create duplicate Work Items
+        /// in case the Work Item takes longer than the cron interval.
+        /// </summary>
         public IReadOnlyList<NQueueCronJob> CronJobs = new List<NQueueCronJob>();
 
         private volatile IReadOnlyCollection<string> _localHttpAddresses = new List<string>();
+        /// <summary>
+        /// Used to enable the nQueueClient.Localhost() method.
+        /// You probably want this code:
+        ///     config.LocalHttpAddresses = s.GetRequiredService&lt;IServer&gt;().Features.Get&lt;IServerAddressesFeature&gt;().Addresses.ToList();
+        /// </summary>
         public IReadOnlyCollection<string> LocalHttpAddresses
         {
             get => _localHttpAddresses;
@@ -59,6 +88,10 @@ namespace NQueue
             return conn;
         }
 
+        /// <summary>
+        /// Timezone to store DateTimeOffsets in the DB (to make them more readable).  Used by Cron Jobs
+        /// to understand when the cron jobs should run.
+        /// </summary>
         public TimeZoneInfo TimeZone { get; set; } = TimeZoneInfo.Local;
 
         internal async ValueTask<IWorkItemDbConnection> GetWorkItemDbConnection()

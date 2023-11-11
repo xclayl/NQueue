@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
 
 
-        <PackageVersion>1.0.0</PackageVersion>
+        <PackageVersion>1.1.1</PackageVersion>
         <Authors>Clay Lenhart</Authors>
         <Description>Sets up Open Telemetry tracing for NQueue</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -17,6 +17,7 @@
         <RepositoryType>git</RepositoryType>
         <PackageTags>queuing, message broker, outbox pattern, message bus</PackageTags>
         <PackageReadmeFile>readme.md</PackageReadmeFile>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
     <ItemGroup>

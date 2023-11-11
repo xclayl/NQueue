@@ -3,6 +3,10 @@ using System.Reflection;
 
 namespace NQueue;
 
+/// <summary>
+/// Used internally, but needed to be public by the NQueue.Extensions.OpenTelemetry package.
+/// I wouldn't use this directly.
+/// </summary>
 public static class NQueueActivitySource
 {
     private static readonly AssemblyName AssemblyName 

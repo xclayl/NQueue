@@ -8,11 +8,36 @@ using NQueue.Internal;
 
 namespace NQueue
 {
+    /// <summary>
+    /// Used for enqueuing Work items
+    /// </summary>
     public interface INQueueClient
     {
+        /// <summary>
+        /// Adds a Work Item to the queue.
+        /// </summary>
+        /// <param name="url">The URL to call when consuming this Work Item</param>
+        /// <param name="queueName">Name of the queue. If queue is null, Guid.NewGuid() is used. All Work Items in
+        /// queues run serially, in FIFO order, including
+        /// when errors occur (blocking Work Items in the same queue)</param>
+        /// <param name="tran">Database transaction to use when adding the Work Item</param>
+        /// <param name="debugInfo">A string you can use.  NQueue ignores this.  I've found it useful to
+        /// identify the code that create a Work Item that failed when debugging code.</param>
+        /// <param name="duplicatePrevention">If true, it won't add this Work Item if an identical Work Item
+        /// Already exists.</param>
         ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null,
             bool duplicatePrevention = false);
 
+        /// <summary>
+        /// Helper method to dynamically determine the local host URL.  Useful when calling Enqueue()
+        /// To use this, call the following when configuring NQueue
+        /// services.AddNQueueHostedService((s, config) =&gt;
+        ///{
+        ///     config.LocalHttpAddresses = s.GetRequiredService&lt;IServer&gt;().Features.Get&lt;IServerAddressesFeature&gt;()!.Addresses.ToList();
+        ///});
+        /// </summary>
+        /// <param name="relativeUri"></param>
+        /// <returns></returns>
         ValueTask<Uri> Localhost(string relativeUri);
     }
 

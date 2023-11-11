@@ -10,7 +10,10 @@ using NQueue.Internal.Workers;
 
 namespace NQueue.Testing
 {
-    
+    /// <summary>
+    /// Instead of enabling background processing during tests, you can use this to control
+    /// when background activity occurs.
+    /// </summary>
     public class NQueueHostedServiceFake
     {
         private readonly NQueueServiceConfig _config;
@@ -44,7 +47,10 @@ namespace NQueue.Testing
 
 
         /// <summary>
-        /// Wait and process all work items
+        /// Wait and process all work items.  Runs until there are no Work Items to immediately take.
+        /// When this class is used for tests by calling AddNQueueHostedService(fake), no
+        /// background activity occurs.  This method runs the background code to search
+        /// for new WorkItems and process them.
         /// </summary>
         public async ValueTask ProcessAll(Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
@@ -64,7 +70,10 @@ namespace NQueue.Testing
         }
         
         /// <summary>
-        /// Wait and process one (or zero) work items
+        /// Wait and process one (or zero) work items.
+        /// When this class is used for tests by calling AddNQueueHostedService(fake), no
+        /// background activity occurs.  This method runs the background code to search
+        /// for new WorkItems and process one.
         /// </summary>
         public async ValueTask ProcessOne(Func<HttpClient> client, ILoggerFactory loggerFactory)
         {

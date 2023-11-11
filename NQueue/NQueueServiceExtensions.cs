@@ -11,6 +11,11 @@ namespace NQueue
 
     public static class NQueueServiceExtensions
     {
+        /// <summary>
+        /// The normal way to wire up NQueue.
+        /// setting config.CreateDbConnection is the only property you have to set,
+        /// but even that is optional if you're testing with the in-memory queues.
+        /// </summary>
         public static IServiceCollection AddNQueueHostedService(this IServiceCollection services,
             Func<IServiceProvider, NQueueServiceConfig, ValueTask> configBuilder)
         {
