@@ -18,7 +18,7 @@ namespace NQueue
     {
         // public bool RunWorkers { get; set; } = true;
         public int QueueRunners { get; set; } = 1;
-        public TimeSpan PollInterval { get; set; } = TimeSpan.FromMinutes(5);
+        public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(30);
         public Func<HttpRequestMessage, ValueTask> ModifyHttpRequest { get; set; } = (_) => ValueTask.CompletedTask;
         public Func<ValueTask<DbConnection?>> CreateDbConnection { get; set; } = () => ValueTask.FromResult((DbConnection?) null);
         public IReadOnlyList<NQueueCronJob> CronJobs = new List<NQueueCronJob>();

@@ -1,10 +1,11 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace NQueue.Internal.Workers
 {
 
-    internal interface IWorker 
+    internal interface IWorker : IDisposable
     {
         ValueTask ExecuteAsync(CancellationToken stoppingToken);
 

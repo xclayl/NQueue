@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using NQueue.Internal.Model;
 using NQueue.Internal.Workers;
 
 namespace NQueue.Internal
@@ -51,12 +52,14 @@ namespace NQueue.Internal
                             CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, reloadTrigger.Token);
 
 
-                        var queueConsumers = Enumerable.Range(0, config.QueueRunners)
-                            .Select(i => new WorkItemConsumer($"{i}", config.PollInterval, conn,
-                                _httpClientFactory, config, _loggerFactory))
-                            .ToList();
+                        var queueConsumers = new []
+                        {
+                            new WorkItemConsumer(config.QueueRunners, config.PollInterval, conn,
+                                _httpClientFactory, config, _loggerFactory)
+                        };
+                     
 
-                        var workers = new List<IWorker>();
+                        using var workers = new DisposableList<IWorker>();
 
                         if (config.CronJobs.Any())
                         {
@@ -69,7 +72,7 @@ namespace NQueue.Internal
                         if (workers.Any())
                         {
                             _serviceState.Configure(workers);
-
+                            
                             await Task.WhenAll(workers.Select(w => w.ExecuteAsync(comboCt.Token).AsTask()));
                         }
                         else

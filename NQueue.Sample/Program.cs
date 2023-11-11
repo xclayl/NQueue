@@ -60,6 +60,8 @@ builder.Services.AddNQueueHostedService((s, config) =>
         new NQueueCronJob("my-cron", "*/5 * * * *", "http://localhost:5000/api/NQueue/ErrorOp", "my-queue")
     };
 
+    config.QueueRunners = 100;
+
     config.LocalHttpAddresses = s.GetService<IServer>().Features.Get<IServerAddressesFeature>().Addresses.ToList();
                 
     return default;

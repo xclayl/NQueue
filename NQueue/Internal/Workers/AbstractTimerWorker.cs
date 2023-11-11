@@ -104,6 +104,7 @@ namespace NQueue.Internal.Workers
         }
 
         protected internal abstract ValueTask<bool> ExecuteOne();
+        public abstract void Dispose();
     }
 
 }

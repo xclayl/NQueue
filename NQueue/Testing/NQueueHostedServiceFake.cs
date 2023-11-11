@@ -48,7 +48,7 @@ namespace NQueue.Testing
         /// </summary>
         public async ValueTask ProcessAll(Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
-            var consumer = new WorkItemConsumer("testing",
+            var consumer = new WorkItemConsumer(1,
                 TimeSpan.Zero,
                 await _config.GetWorkItemDbConnection(),
                 new MyHttpClientFactory(client),
@@ -68,7 +68,7 @@ namespace NQueue.Testing
         /// </summary>
         public async ValueTask ProcessOne(Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
-            var consumer = new WorkItemConsumer("testing",
+            var consumer = new WorkItemConsumer(1,
                 TimeSpan.Zero,
                 await _config.GetWorkItemDbConnection(),
                 new MyHttpClientFactory(client),

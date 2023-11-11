@@ -54,6 +54,11 @@ namespace NQueue.Internal.Workers
             return false;
         }
 
+        public override void Dispose()
+        {
+            // do nothing
+        }
+
         private async ValueTask ProcessCron(CronJobInfo? state, NQueueCronJob nQueueCronJob)
         {
             await using var tran = await _workItemDbConnection.BeginTran();

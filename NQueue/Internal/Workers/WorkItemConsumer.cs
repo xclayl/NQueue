@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NQueue.Internal.Db;
@@ -16,11 +18,13 @@ namespace NQueue.Internal.Workers
         private readonly NQueueServiceConfig _config;
         private readonly IWorkItemDbConnection _workItemDbConnection;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly SemaphoreSlim _lock;
+        private readonly int _maxQueueRunners;
 
-        public WorkItemConsumer(string runnerName, TimeSpan pollInterval, IWorkItemDbConnection workItemDbConnection,
+        public WorkItemConsumer(int maxQueueRunners, TimeSpan pollInterval, IWorkItemDbConnection workItemDbConnection,
             IHttpClientFactory httpClientFactory, NQueueServiceConfig config, ILoggerFactory loggerFactory) : base(
             pollInterval,
-            $"{typeof(WorkItemConsumer).FullName}.{runnerName}",
+            typeof(WorkItemConsumer).FullName ?? "WorkItemConsumer",
             config.TimeZone,
             loggerFactory
         )
@@ -28,56 +32,103 @@ namespace NQueue.Internal.Workers
             _workItemDbConnection = workItemDbConnection;
             _httpClientFactory = httpClientFactory;
             _config = config;
+            _lock = new SemaphoreSlim(maxQueueRunners, maxQueueRunners);
+            _maxQueueRunners = maxQueueRunners;
         }
 
         protected internal override async ValueTask<bool> ExecuteOne()
         {
             var logger = CreateLogger();
-            logger.Log(LogLevel.Information, "Looking for work");
+            logger.Log(LogLevel.Debug, "Looking for work");
+
+            WorkItemInfo? request;
             
             var query = await _workItemDbConnection.Get();
-            var request = await query.NextWorkItem();
+            try
+            {
+                await _lock.WaitAsync();
+                request = await query.NextWorkItem();
+            }
+            finally
+            {
+                _lock.Release();
+            }
 
             if (request == null)
             {
                 await query.PurgeWorkItems();
-                logger.Log(LogLevel.Information, "no work items found");
+                logger.Log(LogLevel.Debug, "no work items found");
                 return false;
             }
+            
 
-            using var _ = StartWorkItemActivity(request);
+            ExecuteWorkItem(request, query, logger);
+
+            return true;
+        }
+
+        public override void Dispose()
+        {
+            var deadline = DateTimeOffset.UtcNow.AddMinutes(5);
+            
+            // make sure tasks finish by taking all the locks
+            Enumerable.Range(0, _maxQueueRunners).ToList().ForEach(_ =>
+            {
+                var timeout = deadline - DateTimeOffset.UtcNow;
+                if (timeout > TimeSpan.Zero)
+                    _lock.Wait(timeout);
+            });
+            _lock.Dispose();
+        }
+
+
+        private async void ExecuteWorkItem(WorkItemInfo request, IWorkItemDbProcs query, ILogger logger)
+        {
+            // "async void" is on purpose.  It means "fire and forget"
+
             try
             {
+                await _lock.WaitAsync();
 
-                using var httpClient = _httpClientFactory.CreateClient();
-
-                httpClient.Timeout = TimeSpan.FromHours(1);
-                using var httpReq = new HttpRequestMessage();
-                httpReq.RequestUri = new Uri(request.Url);
-                httpReq.Method = HttpMethod.Get;
-                await _config.ModifyHttpRequest(httpReq);
-                using var resp = await httpClient.SendAsync(httpReq);
-
-                if (resp.IsSuccessStatusCode)
+                using var _ = StartWorkItemActivity(request);
+                try
                 {
-                    await query.CompleteWorkItem(request.WorkItemId);
-                    logger.Log(LogLevel.Information, "work item completed");
-                    return true;
+                    using var httpClient = _httpClientFactory.CreateClient();
+
+                    httpClient.Timeout = TimeSpan.FromHours(1);
+                    using var httpReq = new HttpRequestMessage();
+                    httpReq.RequestUri = new Uri(request.Url);
+                    httpReq.Method = HttpMethod.Get;
+                    await _config.ModifyHttpRequest(httpReq);
+                    using var resp = await httpClient.SendAsync(httpReq);
+
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        await query.CompleteWorkItem(request.WorkItemId);
+                        logger.Log(LogLevel.Information, "work item completed");
+                    }
+                    else
+                    {
+                        await query.FailWorkItem(request.WorkItemId);
+                        logger.Log(LogLevel.Warning,
+                            $"work item, {httpReq.Method} {httpReq.RequestUri}, failed with status code {resp.StatusCode}");
+                    }
+
                 }
-
-                await query.FailWorkItem(request.WorkItemId);
-                logger.Log(LogLevel.Warning, $"work item, {httpReq.Method} {httpReq.RequestUri}, failed with status code {resp.StatusCode}");
-                return false;
+                catch (Exception e)
+                {
+                    logger.LogError(e.ToString());
+                    await query.FailWorkItem(request.WorkItemId);
+                    logger.Log(LogLevel.Information, "work item faulted");
+                }
+                
             }
-            catch (Exception e)
+            finally
             {
-                logger.LogError(e.ToString());
+                _lock.Release();
             }
-
-
-            await query.FailWorkItem(request.WorkItemId);
-            logger.Log(LogLevel.Information, "work item faulted");
-            return false;
+            
+            PollNow();
         }
 
         private static Activity? StartWorkItemActivity(WorkItemInfo request)
