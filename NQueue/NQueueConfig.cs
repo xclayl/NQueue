@@ -44,6 +44,7 @@ namespace NQueue
         /// A list of cron jobs which create Work Items on a schedule.
         /// These will not create duplicate Work Items
         /// in case the Work Item takes longer than the cron interval.
+        /// You probably want to set the TimeZone property as well.
         /// </summary>
         public IReadOnlyList<NQueueCronJob> CronJobs = new List<NQueueCronJob>();
 
@@ -91,6 +92,7 @@ namespace NQueue
         /// <summary>
         /// Timezone to store DateTimeOffsets in the DB (to make them more readable).  Used by Cron Jobs
         /// to understand when the cron jobs should run.
+        /// Default = TimeZoneInfo.Local
         /// </summary>
         public TimeZoneInfo TimeZone { get; set; } = TimeZoneInfo.Local;
 
