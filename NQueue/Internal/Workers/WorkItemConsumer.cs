@@ -20,6 +20,8 @@ namespace NQueue.Internal.Workers
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly SemaphoreSlim _lock;
         private readonly int _maxQueueRunners;
+        private long _currentQueueRunners = 0;
+        private readonly SpinWait _testingSpinWait = new();
 
         public WorkItemConsumer(int maxQueueRunners, TimeSpan pollInterval, IWorkItemDbConnection workItemDbConnection,
             IHttpClientFactory httpClientFactory, NQueueServiceConfig config, ILoggerFactory loggerFactory) : base(
@@ -86,9 +88,12 @@ namespace NQueue.Internal.Workers
         {
             // "async void" is on purpose.  It means "fire and forget"
 
+            
+            Interlocked.Increment(ref _currentQueueRunners);
+           
+            await _lock.WaitAsync();
             try
             {
-                await _lock.WaitAsync();
 
                 using var _ = StartWorkItemActivity(request);
                 try
@@ -121,14 +126,24 @@ namespace NQueue.Internal.Workers
                     await query.FailWorkItem(request.WorkItemId);
                     logger.Log(LogLevel.Information, "work item faulted");
                 }
-                
             }
             finally
             {
                 _lock.Release();
+                Interlocked.Decrement(ref _currentQueueRunners);
             }
+        
             
             PollNow();
+        }
+
+        internal async ValueTask WaitUntilNoActivity()
+        {
+            while (Interlocked.Read(ref _currentQueueRunners) > 0)
+            {
+                _testingSpinWait.SpinOnce();
+                await Task.Delay(TimeSpan.FromMilliseconds(20));
+            }
         }
 
         private static Activity? StartWorkItemActivity(WorkItemInfo request)

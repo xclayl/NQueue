@@ -67,6 +67,9 @@ namespace NQueue.Testing
             {
                 hasMore = await consumer.ExecuteOne();
             }
+            
+
+            await consumer.WaitUntilNoActivity();
         }
         
         /// <summary>
@@ -86,6 +89,8 @@ namespace NQueue.Testing
         
             
             await consumer.ExecuteOne();
+
+            await consumer.WaitUntilNoActivity();
         }
 
 
