@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NQueue.Internal;
+using NQueue.Internal.Db.InMemory;
 using NQueue.Internal.Workers;
 
 namespace NQueue.Testing
@@ -106,12 +107,22 @@ namespace NQueue.Testing
             public HttpClient CreateClient(string name) => _client();
         }
 
-
+        
+        /// <summary>
+        /// Deletes all nqueue data so that the next test can run with an empty queue.
+        /// </summary>
         public async ValueTask DeleteAllNQueueData()
         {
             var db = await _config.GetWorkItemDbConnection();
             
             await (await db.Get()).DeleteAllNQueueDataForUnitTests();
+        }
+
+
+        public async ValueTask<InMemoryDb?> GetInMemoryDb()
+        {
+            var db = await _config.GetWorkItemDbConnection();
+            return (await db.Get() as InMemoryWorkItemDbProcs)?.Db;
         }
     }
 }

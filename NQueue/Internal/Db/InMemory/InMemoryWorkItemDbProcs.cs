@@ -10,174 +10,40 @@ namespace NQueue.Internal.Db.InMemory;
 
 internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
 {
-    internal class WorkItem
-    {
-        public int WorkItemId { get; init; }
-        public Uri Url { get; init; }
-        public string QueueName { get; init; }
-        public string? DebugInfo { get; init; }
-        public bool IsIngested { get; init; }
-        public string? Internal { get; init; }
-    }
+    public readonly InMemoryDb Db = new();
 
-    private class Queue
-    {
-        public string QueueName { get; set; }
-        public DateTimeOffset? LockedUntil { get; set; }
-    }
+    public ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo,
+        bool duplicateProtection, string? internalJson) =>
+        Db.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicateProtection, internalJson);
+
+    public ValueTask<WorkItemInfo?> NextWorkItem() => Db.NextWorkItem();
+
+    public ValueTask CompleteWorkItem(int workItemId) => Db.CompleteWorkItem(workItemId);
+
+    public ValueTask FailWorkItem(int workItemId) => Db.FailWorkItem(workItemId);
+
+    public ValueTask PurgeWorkItems() => Db.PurgeWorkItems();
+
+    public ValueTask DeleteAllNQueueDataForUnitTests() => Db.DeleteAllNQueueDataForUnitTests();
 
 
+    internal ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState() => Db.GetCronJobState();
 
-    private readonly SemaphoreSlim _lock = new(1, 1);
-    private readonly List<WorkItem> _workItems = new();
-    private readonly List<WorkItem> _completedWorkItems = new();
-    private readonly List<CronJobInfo> _cronJobState = new();
-    private readonly List<Queue> _queues = new();
-    private int _nextId = 23;
-        
-
-    public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson)
-    {
-        if (tran != null)
-            throw new Exception("The in-memory NQueue implementation is not compatible with DB transactions.");
-
-        using var _ = await ALock.Wait(_lock);
-            
-        queueName ??= Guid.NewGuid().ToString();
-            
-            
-        if (duplicateProtection)
-        {
-            if (_workItems.Any(w => w.Url == url && w.QueueName == queueName))
-                return;
-        }
-
-        _workItems.Add(new WorkItem
-        {
-            WorkItemId = _nextId++,
-            Url = url,
-            QueueName = queueName,
-            DebugInfo = debugInfo,
-            IsIngested = false,
-            Internal = internalJson,
-        });
-            
-                
-            
-    }
-
-    internal async ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState()
-    {
-        using var _ = await ALock.Wait(_lock);
-        return _cronJobState.ToList();
-    }
-
-    internal async ValueTask<ICronTransaction> BeginTran()
-    {
-        await _lock.WaitAsync();
-        return new CronWorkItemTran(_lock, _workItems, _cronJobState, () => _nextId++);
-    }
-
-    public async ValueTask<WorkItemInfo?> NextWorkItem()
-    {
-        using var _ = await ALock.Wait(_lock);
-
-        foreach (var wi in _workItems.Where(w => !w.IsIngested))
-        {
-            if (_queues.All(q => q.QueueName != wi.QueueName))
-            {
-                _queues.Add(new Queue
-                {
-                    QueueName = wi.QueueName,
-                    LockedUntil = null,
-                });
-            }
-        }
-
-        var now = DateTimeOffset.Now;
-
-        var next = _workItems.FirstOrDefault(w =>
-        {
-            var queue = _queues.Single(q => q.QueueName == w.QueueName);
-
-            if (queue.LockedUntil != null && queue.LockedUntil > now)
-                return false;
-
-            return true;
-        });
-
-        if (next == null)
-            return null;
-            
-        var queue = _queues.Single(q => q.QueueName == next.QueueName);
-
-        queue.LockedUntil = now.AddHours(1);
-
-        return new WorkItemInfo(next.WorkItemId, next.Url.AbsoluteUri, next.Internal);
-    }
-
-    public async ValueTask CompleteWorkItem(int workItemId)
-    {
-        using var _ = await ALock.Wait(_lock);
-
-        var wi = _workItems.Single(w => w.WorkItemId == workItemId);
-
-        var queue = _queues.Single(q => q.QueueName == wi.QueueName);
-
-        _workItems.Remove(wi);
-        _completedWorkItems.Add(wi);
-
-        if (_workItems.Any(w => w.QueueName == queue.QueueName))
-        {
-            queue.LockedUntil = null;
-        }
-        else
-        {
-            _queues.Remove(queue);
-        }
-            
-    }
-
-    public async ValueTask FailWorkItem(int workItemId)
-    {
-        using var _ = await ALock.Wait(_lock);
-            
-        var wi = _workItems.Single(w => w.WorkItemId == workItemId);
-
-        var queue = _queues.Single(q => q.QueueName == wi.QueueName);
-        queue.LockedUntil = DateTimeOffset.Now.AddMinutes(5);
-    }
-
-    public async ValueTask PurgeWorkItems()
-    {
-        using var _ = await ALock.Wait(_lock);
-
-        _completedWorkItems.Clear();
-    }
-
-    public async ValueTask DeleteAllNQueueDataForUnitTests()
-    {
-        using var _ = await ALock.Wait(_lock);
-
-        _workItems.Clear();
-        _completedWorkItems.Clear();
-        _queues.Clear();
-        _cronJobState.Clear();
-    }
+    internal ValueTask<ICronTransaction> BeginTran() => Db.BeginTran();
 }
 
 class CronWorkItemTran : ICronTransaction
 {
     private IDisposable? _lock;
-    private readonly List<InMemoryWorkItemDbProcs.WorkItem> _workItems;
+    private readonly List<InMemoryDb.WorkItem> _workItems;
     private readonly List<CronJobInfo> _cronJobState;
     private readonly Func<int> _nextCronJobId;
     
     
-    private readonly List<InMemoryWorkItemDbProcs.WorkItem> _tempWorkItems=new List<InMemoryWorkItemDbProcs.WorkItem>();
-    private readonly List<CronJobInfo> _tempCronJobState = new List<CronJobInfo>(); 
+    private readonly List<InMemoryDb.WorkItem> _tempWorkItems=new();
+    private readonly List<CronJobInfo> _tempCronJobState = new(); 
 
-    public CronWorkItemTran(IDisposable @lock, List<InMemoryWorkItemDbProcs.WorkItem> workItems, List<CronJobInfo> cronJobState, Func<int> nextCronJobId)
+    public CronWorkItemTran(IDisposable @lock, List<InMemoryDb.WorkItem> workItems, List<CronJobInfo> cronJobState, Func<int> nextCronJobId)
     {
         _lock = @lock;
         _workItems = workItems;
@@ -204,7 +70,7 @@ class CronWorkItemTran : ICronTransaction
     public ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
     {
         queueName ??= Guid.NewGuid().ToString();
-        _tempWorkItems.Add(new InMemoryWorkItemDbProcs.WorkItem
+        _tempWorkItems.Add(new InMemoryDb.WorkItem
         {
             DebugInfo = debugInfo,
             Url = url,
