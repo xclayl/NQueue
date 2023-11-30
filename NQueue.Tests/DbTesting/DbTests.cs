@@ -9,16 +9,27 @@ using Xunit;
 
 namespace NQueue.Tests.DbTesting;
 
-public enum DbType
-{
-    InMemory,
-    Postgres,
-    SqlServer
-}
+
 
 public class DbTests : IAsyncLifetime
 {
-    private readonly IReadOnlyDictionary<DbType, IDbCreator> _dbCreators;
+    public enum DbType
+    {
+        InMemory,
+        Postgres,
+        SqlServer
+    }
+
+    private readonly IReadOnlyDictionary<DbType, IDbCreator> _dbCreators = new Dictionary<DbType, IDbCreator>()
+    {
+        { DbType.InMemory, new InMemoryDbCreator() },
+        { DbType.Postgres, new PostgresDbCreator() },
+        { DbType.SqlServer, new SqlServerDbCreator() }
+    };
+    
+    
+    
+    
     public Task InitializeAsync() => Task.CompletedTask;
     public Task DisposeAsync() => Task.WhenAll(_dbCreators.Select(async c => await c.Value.DisposeAsync()));
 
@@ -27,26 +38,10 @@ public class DbTests : IAsyncLifetime
 
     static DbTests()
     {
-        MyTheoryData.Add(DbType.InMemory);
-        MyTheoryData.Add(DbType.Postgres);
-        MyTheoryData.Add(DbType.SqlServer);
+        var array = ((DbType[])Enum.GetValues(typeof(DbType))).ToList();
+        array.ForEach(MyTheoryData.Add);
     }
-
-    public DbTests()
-    {
-        _dbCreators = MyTheoryData
-            .Select(o => (DbType) o.Single())
-            .Select(dbType =>
-                dbType switch
-                {
-                    DbType.InMemory => (dbType, (IDbCreator) new InMemoryDbCreator()),
-                    DbType.Postgres => (dbType, new PostgresDbCreator()),
-                    DbType.SqlServer => (dbType, new SqlServerDbCreator()),
-                    _ => throw new Exception($"Unknown type: {dbType}")
-                }
-            )
-            .ToDictionary(r => r.Item1, r => r.Item2);
-    }
+  
 
     [Theory]
     [MemberData(nameof(MyTheoryData))]

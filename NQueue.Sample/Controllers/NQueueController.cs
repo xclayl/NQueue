@@ -44,8 +44,9 @@ namespace NQueue.Sample.Controllers
             return _msg;
         }
 
-        public IActionResult ErrorOp()
+        public async Task<IActionResult> ErrorOp()
         {
+            await Task.Delay(TimeSpan.FromMinutes(2));
             return Problem("a problem");
         }
 

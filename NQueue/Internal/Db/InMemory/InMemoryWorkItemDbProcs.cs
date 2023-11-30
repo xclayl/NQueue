@@ -34,70 +34,123 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
 
 class CronWorkItemTran : ICronTransaction
 {
-    private IDisposable? _lock;
+    private SemaphoreSlim _lock;
     private readonly List<InMemoryDb.WorkItem> _workItems;
     private readonly List<CronJobInfo> _cronJobState;
-    private readonly Func<int> _nextCronJobId;
+    private readonly Func<int> _nextId;
     
     
     private readonly List<InMemoryDb.WorkItem> _tempWorkItems=new();
-    private readonly List<CronJobInfo> _tempCronJobState = new(); 
+    private readonly List<CronJobInfo> _tempCronJobState = new();
+    private bool _lockAcquired;
 
-    public CronWorkItemTran(IDisposable @lock, List<InMemoryDb.WorkItem> workItems, List<CronJobInfo> cronJobState, Func<int> nextCronJobId)
+    public CronWorkItemTran(SemaphoreSlim @lock, List<InMemoryDb.WorkItem> workItems, List<CronJobInfo> cronJobState, Func<int> nextId)
     {
         _lock = @lock;
         _workItems = workItems;
         _cronJobState = cronJobState;
-        _nextCronJobId = nextCronJobId;
+        _nextId = nextId;
     }
 
     public ValueTask DisposeAsync()
     {
-        _lock?.Dispose();
-        _lock = null;
+        if (_lockAcquired)
+            _lock.Release();
+        _lockAcquired = false;
         return ValueTask.CompletedTask;
     }
 
     public ValueTask CommitAsync()
     {
-        _workItems.AddRange(_tempWorkItems);
+        if (!_lockAcquired)
+            throw new Exception("In memory cron lock not acquired");
+        
+        foreach (var tempWorkItem in _tempWorkItems)
+        {
+            if (!tempWorkItem.DuplicateProtection)
+                _workItems.Add(tempWorkItem);
+            else
+            {
+                var count = _workItems.Count(w => w.QueueName == tempWorkItem.QueueName
+                                                  && w.Url == tempWorkItem.Url);
+                if (count <= 1)
+                    _workItems.Add(tempWorkItem);
+            }
+        }
+
+        foreach (var tempCj in _tempCronJobState)
+        {
+            var cj = _cronJobState.SingleOrDefault(j => j.CronJobId == tempCj.CronJobId);
+            if (cj != null)
+                _cronJobState.Remove(cj);
+
+            _cronJobState.Add(tempCj);
+        }
+        
         _tempWorkItems.Clear();
-        _lock?.Dispose();
-        _lock = null;
+        _tempCronJobState.Clear();
+        _lock.Release();
+        _lockAcquired = false;
         return ValueTask.CompletedTask;
     }
 
     public ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
     {
+        
+        if (!_lockAcquired)
+            throw new Exception("In memory cron lock not acquired");
+        
         queueName ??= Guid.NewGuid().ToString();
         _tempWorkItems.Add(new InMemoryDb.WorkItem
         {
+            WorkItemId = _nextId(),
             DebugInfo = debugInfo,
             Url = url,
             QueueName = queueName,
+            DuplicateProtection = true
         });
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask<int> CreateCronJob(string name)
+    public async ValueTask<int> CreateCronJob(string name)
     {
-        var cronJobId = _nextCronJobId();
-        _tempCronJobState.Add(new CronJobInfo(cronJobId, name, new DateTimeOffset(2000, 1 , 1, 0,0 ,0, TimeSpan.Zero)));
-        return ValueTask.FromResult(cronJobId);
+        if (_lockAcquired)
+            throw new Exception("In memory cron lock should not be acquired");
+
+        using var _ = await ALock.Wait(_lock);
+        
+        var cronJobId = _nextId();
+        _tempCronJobState.Add(new CronJobInfo(cronJobId, name,
+            new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+        return cronJobId;
     }
 
-    public ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(int cronJobId)
+    public async ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(int cronJobId)
     {
-        var cj = _cronJobState.Single(j => j.CronJobId == cronJobId);
-        return ValueTask.FromResult((cj.LastRanAt, true));
+        await _lock.WaitAsync();
+        _lockAcquired = true;
+        
+        var cj = _tempCronJobState.SingleOrDefault(j => j.CronJobId == cronJobId);
+        if (cj == null)
+        {
+            cj = _cronJobState.Single(j => j.CronJobId == cronJobId);
+            _tempCronJobState.Add(cj);
+        }
+        
+        return (cj.LastRanAt, true);
     }
 
     public ValueTask UpdateCronJobLastRanAt(int cronJobId)
     {
-        var cj = _cronJobState.Single(j => j.CronJobId == cronJobId);
-        _cronJobState.Remove(cj);
+        if (!_lockAcquired)
+            throw new Exception("In memory cron lock not acquired");
+       
+        var cj = _tempCronJobState.Single(j => j.CronJobId == cronJobId);
+        _tempCronJobState.Remove(cj);
         var newCj = new CronJobInfo(cj.CronJobId, cj.CronJobName, DateTimeOffset.Now);
-        _cronJobState.Add(newCj);
+        _tempCronJobState.Add(newCj);
+    
+
         return ValueTask.CompletedTask;
     }
 }

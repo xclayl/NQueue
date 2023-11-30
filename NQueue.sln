@@ -5,6 +5,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionFolder", "SolutionFolder", "{FEA4FDF9-B61F-411A-918B-68E5C023F18E}"
 	ProjectSection(SolutionItems) = preProject
 		Readme.md = Readme.md
+		docker_compose.yml = docker_compose.yml
+		dvs.ps1 = dvs.ps1
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NQueue.Sample", "NQueue.Sample\NQueue.Sample.csproj", "{A8BA502E-8CFB-404B-AE0D-16AB3A0F3D60}"

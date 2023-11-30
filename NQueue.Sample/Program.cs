@@ -31,18 +31,18 @@ builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 builder.Services.AddNQueueHostedService((s, config) =>
 {
-    config.CreateDbConnection = () =>
-    {
-        var cnnBuilder = new SqlConnectionStringBuilder
-        {
-            DataSource = "localhost,15533",
-            InitialCatalog = "NQueueSample",
-            UserID = "NQueueUser",
-            Password = "ihSH3jqeVb7giIgOkohX"
-        };
-        cnnBuilder.Encrypt = !cnnBuilder.DataSource.StartsWith("localhost");
-        return new ValueTask<DbConnection>(new SqlConnection(cnnBuilder.ToString()));
-    };
+    // config.CreateDbConnection = () =>
+    // {
+    //     var cnnBuilder = new SqlConnectionStringBuilder
+    //     {
+    //         DataSource = "localhost,15533",
+    //         InitialCatalog = "NQueueSample",
+    //         UserID = "NQueueUser",
+    //         Password = "ihSH3jqeVb7giIgOkohX"
+    //     };
+    //     cnnBuilder.Encrypt = !cnnBuilder.DataSource.StartsWith("localhost");
+    //     return new ValueTask<DbConnection>(new SqlConnection(cnnBuilder.ToString()));
+    // };
 
     // var cnnBuilder = new NpgsqlConnectionStringBuilder()
     // {
@@ -57,7 +57,7 @@ builder.Services.AddNQueueHostedService((s, config) =>
 
     config.CronJobs = new[]
     {
-        new NQueueCronJob("my-cron", "*/5 * * * *", "http://localhost:5000/api/NQueue/ErrorOp", "my-queue")
+        new NQueueCronJob("my-cron", "* * * * *", "http://localhost:5000/api/NQueue/ErrorOp", "my-queue")
     };
 
     config.QueueRunners = 100;

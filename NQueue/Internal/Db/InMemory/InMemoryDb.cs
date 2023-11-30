@@ -19,6 +19,7 @@ public class InMemoryDb
         public string? DebugInfo { get; init; }
         public bool IsIngested { get; init; }
         public string? Internal { get; init; }
+        public bool DuplicateProtection { get; init; }
     }
 
     public class Queue
@@ -68,7 +69,11 @@ public class InMemoryDb
             
         if (duplicateProtection)
         {
-            if (_workItems.Any(w => w.Url == url && w.QueueName == queueName))
+            
+            var count = _workItems.Count(w => w.QueueName == queueName
+                                              && w.Url == url);
+            
+            if (count > 1)
                 return;
         }
 
@@ -94,7 +99,6 @@ public class InMemoryDb
 
     internal async ValueTask<ICronTransaction> BeginTran()
     {
-        await _lock.WaitAsync();
         return new CronWorkItemTran(_lock, _workItems, _cronJobState, () => _nextId++);
     }
 
