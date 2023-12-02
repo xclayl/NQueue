@@ -52,22 +52,17 @@ namespace NQueue.Internal
                             CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, reloadTrigger.Token);
 
 
-                        var queueConsumers = new []
-                        {
-                            new WorkItemConsumer(config.QueueRunners, config.PollInterval, conn,
-                                _httpClientFactory, config, _loggerFactory)
-                        };
-                     
-
                         using var workers = new DisposableList<IWorker>();
+                        
+                        if (config.QueueRunners > 0)
+                            workers.Add( new WorkItemConsumer(config.QueueRunners, config.PollInterval, conn,
+                                _httpClientFactory, config, _loggerFactory));
+                        
 
                         if (config.CronJobs.Any())
-                        {
-                            var cronWorker = new CronJobWorker(conn, config.TimeZone, _configFactory,
-                                _loggerFactory);
-                            workers.Add(cronWorker);
-                        }
-                        workers.AddRange(queueConsumers);
+                            workers.Add(new CronJobWorker(conn, config.TimeZone, _configFactory,
+                                _loggerFactory));
+                        
 
                         if (workers.Any())
                         {

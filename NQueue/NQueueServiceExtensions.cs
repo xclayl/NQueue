@@ -54,7 +54,7 @@ namespace NQueue
 
         /// <summary>
         /// Disables background processing so that you can control when polling happens in your tests.
-        /// Call NQueueHostedServiceFake.PollNow() to process work items
+        /// You'll call NQueueHostedServiceFake.ProcessOne() or ProcessAll() to process work items manually.
         /// </summary>
         public static IServiceCollection AddNQueueHostedService(this IServiceCollection services,
             NQueueHostedServiceFake testServiceFake)

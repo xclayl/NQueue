@@ -5,7 +5,8 @@ namespace NQueue;
 
 /// <summary>
 /// Used internally, but needed to be public by the NQueue.Extensions.OpenTelemetry package.
-/// I wouldn't use this directly.
+/// I wouldn't use this directly.  It's probably not interesting to you anyways.  It
+/// provides the name version to use with Open Telemetry.
 /// </summary>
 public static class NQueueActivitySource
 {

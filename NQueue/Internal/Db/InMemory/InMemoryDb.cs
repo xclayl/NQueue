@@ -11,7 +11,7 @@ namespace NQueue.Internal.Db.InMemory;
 public class InMemoryDb
 {
     
-    public class WorkItem
+    public record class WorkItem
     {
         public int WorkItemId { get; init; }
         public Uri Url { get; init; }
@@ -20,6 +20,7 @@ public class InMemoryDb
         public bool IsIngested { get; init; }
         public string? Internal { get; init; }
         public bool DuplicateProtection { get; init; }
+        public int FailCount { get; init; } = 0;
     }
 
     public class Queue
@@ -173,13 +174,16 @@ public class InMemoryDb
         using var _ = await ALock.Wait(_lock);
             
         var wi = _workItems.Single(w => w.WorkItemId == workItemId);
-
         var queue = _queues.Single(q => q.QueueName == wi.QueueName);
+        
+        _workItems.Remove(wi);
+        _workItems.Add(wi with { FailCount = wi.FailCount + 1 });
+        
         _queues.Remove(queue);
         _queues.Add(new Queue
         {
             QueueName = queue.QueueName,
-            LockedUntil = DateTimeOffset.Now.AddMinutes(5)
+            LockedUntil = DateTimeOffset.Now.AddMinutes(5),
         });
     }
 

@@ -15,8 +15,9 @@ namespace NQueue
         /// <returns>true = healthy.  A string to determine what issues there might be</returns>
         ValueTask<(bool healthy, string stateInfo)> HealthCheck();
         /// <summary>
-        /// Triggers NQueue to query Work Items.  Call this frequently as you like.  It has low overhead.
-        /// Multiple calls in a tight loop might mean Work Items are queried once.
+        /// Wakes up background threads to look for work.  This is very fast - feel free to call as many times as you'd like.
+        /// When using NQueueHostedServiceFake, this method does nothing (b/c nothing will be running in the background).  Instead
+        /// call NQueueHostedServiceFake.ProcessAll() or NQueueHostedServiceFake.ProcessOne().
         /// </summary>
         void PollNow();
     }

@@ -49,8 +49,8 @@ namespace NQueue.Testing
 
         /// <summary>
         /// Wait and process all work items.  Runs until there are no Work Items to immediately take.
-        /// When this class is used for tests by calling AddNQueueHostedService(fake), no
-        /// background activity occurs.  This method runs the background code to search
+        /// When this class is used for tests by calling AddNQueueHostedService(new NQueueHostedServiceFake(...)), then no
+        /// background activity occurs. So this method exists to search
         /// for new WorkItems and process them.
         /// </summary>
         public async ValueTask ProcessAll(Func<HttpClient> client, ILoggerFactory loggerFactory)
@@ -75,8 +75,8 @@ namespace NQueue.Testing
         
         /// <summary>
         /// Wait and process one (or zero) work items.
-        /// When this class is used for tests by calling AddNQueueHostedService(fake), no
-        /// background activity occurs.  This method runs the background code to search
+        /// When this class is used for tests by calling AddNQueueHostedService(new NQueueHostedServiceFake(...)), then no
+        /// background activity occurs. So this method exists to search
         /// for new WorkItems and process one.
         /// </summary>
         public async ValueTask ProcessOne(Func<HttpClient> client, ILoggerFactory loggerFactory)
@@ -119,6 +119,12 @@ namespace NQueue.Testing
         }
 
 
+        /// <summary>
+        /// I'm probably going to remove this.  Getting the list of workitems when testing is useful
+        /// for all DB backends.
+        /// For now, you can use this to access the Work Items created for verifying your tests.
+        /// </summary>
+        /// <returns></returns>
         public async ValueTask<InMemoryDb?> GetInMemoryDb()
         {
             var db = await _config.GetWorkItemDbConnection();

@@ -38,7 +38,7 @@ namespace NQueue.Internal
             if (!workers.Any())
             {
                 // give ourselves a minute to startup
-                return (_createdAt.AddMinutes(1) > DateTimeOffset.Now, "Not initialized");
+                return (_createdAt.AddMinutes(1) > DateTimeOffset.Now, "Not initialized - no workers found to process cron jobs (via config.CronJobs) or work items (via config.QueueRunners)");
             }
 
             var sb = new StringBuilder();
@@ -53,7 +53,7 @@ namespace NQueue.Internal
             var conn = await config.GetWorkItemDbConnection();
 
             var queueState = await conn.QueueHealthCheck();
-
+            
             states = states.Concat(new[]
                 {
                     (queueState.healthy, "[NQueue].Queue table", queueState.healthy ? "GOOD" : "BAD",

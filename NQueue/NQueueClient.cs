@@ -22,7 +22,7 @@ namespace NQueue
         /// when errors occur (blocking Work Items in the same queue)</param>
         /// <param name="tran">Database transaction to use when adding the Work Item</param>
         /// <param name="debugInfo">A string you can use.  NQueue ignores this.  I've found it useful to
-        /// identify the code that create a Work Item that failed when debugging code.</param>
+        /// identify the code that created a Work Item that failed to help debug my code.</param>
         /// <param name="duplicatePrevention">If true, it won't add this Work Item if an identical Work Item
         /// Already exists.</param>
         ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null,

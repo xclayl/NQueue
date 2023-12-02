@@ -17,7 +17,7 @@ namespace NQueue
     public class NQueueServiceConfig
     {
         /// <summary>
-        /// Maximum number of Work Items to be processed in parallel.  0 = disables background processing.
+        /// Maximum number of Work Items to be processed in parallel.  0 = disables queue processing.
         /// Feel free to use a ridiculous number, like 1_000_000.
         /// Default = 1
         /// </summary>
@@ -37,7 +37,7 @@ namespace NQueue
         /// <summary>
         /// Used to create the DB Connection to the database to look for Work Items, or anything else like
         /// cron job management.
-        /// Default = null (in-memory queues for testing)
+        /// Default = null (in-memory queues, usually for testing)
         /// </summary>
         public Func<ValueTask<DbConnection?>> CreateDbConnection { get; set; } = () => ValueTask.FromResult((DbConnection?) null);
         /// <summary>
@@ -90,8 +90,8 @@ namespace NQueue
         }
 
         /// <summary>
-        /// Timezone to store DateTimeOffsets in the DB (to make them more readable).  Used by Cron Jobs
-        /// to understand when the cron jobs should run.
+        /// Timezone to understand when the cron jobs should run.
+        /// For SQL Server, it'll use the time zone to store DateTimeOffsets in the DB (to make them more readable).  
         /// Default = TimeZoneInfo.Local
         /// </summary>
         public TimeZoneInfo TimeZone { get; set; } = TimeZoneInfo.Local;

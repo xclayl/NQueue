@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data.Common;
+using System.Linq;
 using System.Threading.Tasks;
 using NQueue.Internal.Model;
 
@@ -30,9 +31,13 @@ namespace NQueue.Internal.Db.InMemory
             return await _procs.GetCronJobState();
         }
 
-        public ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()
+        public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()
         {
-            throw new NotImplementedException();
+            var s = await _procs.Db.GetWorkItems();
+
+            var count = s.Count(wi => wi.FailCount >= 5);
+
+            return (count == 0, count);
         }
 
     }
