@@ -44,23 +44,23 @@ builder.Services.AddNQueueHostedService((s, config) =>
     //     return new ValueTask<DbConnection>(new SqlConnection(cnnBuilder.ToString()));
     // };
 
-    // var cnnBuilder = new NpgsqlConnectionStringBuilder()
-    // {
-    //     Host = "localhost",
-    //     Database = "NQueueSample",
-    //     Username = "nqueueuser",
-    //     Password = "ihSH3jqeVb7giIgOkohX",
-    //     Port = 15532
-    // };
-    // cnnBuilder.SslMode = cnnBuilder.Host == "localhost" ? SslMode.Disable : SslMode.VerifyFull;
-    // config.CreateDbConnection = () => new ValueTask<DbConnection>(new NpgsqlConnection(cnnBuilder.ToString()));
+    var cnnBuilder = new NpgsqlConnectionStringBuilder()
+    {
+        Host = "localhost",
+        Database = "NQueueSample",
+        Username = "nqueueuser",
+        Password = "ihSH3jqeVb7giIgOkohX",
+        Port = 15532
+    };
+    cnnBuilder.SslMode = cnnBuilder.Host == "localhost" ? SslMode.Disable : SslMode.VerifyFull;
+    config.CreateDbConnection = () => new ValueTask<DbConnection>(new NpgsqlConnection(cnnBuilder.ToString()));
 
     config.CronJobs = new[]
     {
         new NQueueCronJob("my-cron", "* * * * *", "http://localhost:5000/api/NQueue/ErrorOp", "my-queue")
     };
 
-    config.QueueRunners = 0;
+    // config.QueueRunners = 0;
 
     config.LocalHttpAddresses = s.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>().Addresses.ToList();
                 

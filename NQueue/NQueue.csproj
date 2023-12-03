@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
-        <PackageVersion>1.1.5-beta001</PackageVersion>
+        <PackageVersion>1.1.5-beta002</PackageVersion>
         <Nullable>enable</Nullable>
         <Authors>Clay Lenhart</Authors>
         <Description>NQueue follows the Outbox pattern by persisting "work items" in your Postgres or SQL Server database using your database transactions by processing them in the background of your dotnet ASPNet Core application.</Description>

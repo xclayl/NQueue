@@ -14,7 +14,8 @@ namespace NQueue
     public interface INQueueClient
     {
         /// <summary>
-        /// Adds a Work Item to the queue.
+        /// Adds a Work Item to the queue.  If the DB tran is null, PollNow() is called, which will
+        /// cause it to query the DB to look for Work Items to process. 
         /// </summary>
         /// <param name="url">The URL to call when consuming this Work Item</param>
         /// <param name="queueName">Name of the queue. If queue is null, Guid.NewGuid() is used. All Work Items in
@@ -44,13 +45,16 @@ namespace NQueue
     internal class NQueueClient : INQueueClient
     {
         private readonly ConfigFactory _configFactory;
+        private readonly IInternalWorkItemServiceState? _state;
 
-        public NQueueClient(ConfigFactory configFactory)
+        public NQueueClient(ConfigFactory configFactory, IInternalWorkItemServiceState? state)
         {
             _configFactory = configFactory;
+            _state = state;
         }
 
 
+        
 
 
         public async ValueTask<Uri> Localhost(string relativeUri)
@@ -129,6 +133,9 @@ myFakeNQueueService.BaseAddress = factory.Server.BaseAddress;
             
             
             await query.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicatePrevention, internalJson);
+            
+            if (tran == null)
+                _state?.PollNow();
         }
 
 

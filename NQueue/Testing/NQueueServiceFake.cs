@@ -7,7 +7,7 @@ namespace NQueue.Testing
 {
     internal class NQueueServiceFake : NQueueClient, INQueueService
     {
-        public NQueueServiceFake(ConfigFactory configFactory): base(configFactory)
+        public NQueueServiceFake(ConfigFactory configFactory): base(configFactory, null)
         {
         }
 

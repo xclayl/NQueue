@@ -19,6 +19,7 @@ namespace NQueue
         /// <summary>
         /// Maximum number of Work Items to be processed in parallel.  0 = disables queue processing.
         /// Feel free to use a ridiculous number, like 1_000_000.
+        /// If this is zero, Cron Jobs will not be processed (by this app)
         /// Default = 1
         /// </summary>
         public int QueueRunners { get; set; } = 1;
@@ -45,6 +46,7 @@ namespace NQueue
         /// These will not create duplicate Work Items
         /// in case the Work Item takes longer than the cron interval.
         /// You probably want to set the TimeZone property as well.
+        /// If config.QueueRunners is zero, Cron Jobs will not be processed (by this app).
         /// </summary>
         public IReadOnlyList<NQueueCronJob> CronJobs = new List<NQueueCronJob>();
 
