@@ -61,7 +61,7 @@ namespace NQueue.Internal
 
                         if (config.CronJobs.Any())
                             workers.Add(new CronJobWorker(conn, config.TimeZone, _configFactory,
-                                _loggerFactory));
+                                _loggerFactory, _serviceState));
                         
 
                         if (workers.Any())

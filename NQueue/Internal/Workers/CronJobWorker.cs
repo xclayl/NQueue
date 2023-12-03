@@ -13,13 +13,15 @@ namespace NQueue.Internal.Workers
     {
         private readonly IWorkItemDbConnection _workItemDbConnection;
         private readonly ConfigFactory _configFactory;
+        private readonly IInternalWorkItemServiceState _state;
 
         public CronJobWorker(IWorkItemDbConnection workItemDbConnection, TimeZoneInfo tz, ConfigFactory configFactory,
-            ILoggerFactory loggerFactory) : base(TimeSpan.FromMinutes(1),
+            ILoggerFactory loggerFactory, IInternalWorkItemServiceState state) : base(TimeSpan.FromMinutes(1),
             typeof(CronJobWorker).FullName ?? nameof(CronJobWorker), tz, loggerFactory)
         {
             _workItemDbConnection = workItemDbConnection;
             _configFactory = configFactory;
+            _state = state;
         }
 
         protected internal override async ValueTask<bool> ExecuteOne()
@@ -88,6 +90,8 @@ namespace NQueue.Internal.Workers
             }
 
             await tran.CommitAsync();
+            
+            _state.PollNow();
         }
 
 
