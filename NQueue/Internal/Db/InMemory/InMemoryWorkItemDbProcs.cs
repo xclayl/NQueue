@@ -16,13 +16,13 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
         bool duplicateProtection, string? internalJson) =>
         Db.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicateProtection, internalJson);
 
-    public ValueTask<WorkItemInfo?> NextWorkItem() => Db.NextWorkItem();
+    public ValueTask<WorkItemInfo?> NextWorkItem(int shard) => Db.NextWorkItem();
 
-    public ValueTask CompleteWorkItem(int workItemId) => Db.CompleteWorkItem(workItemId);
+    public ValueTask CompleteWorkItem(int workItemId, int shard) => Db.CompleteWorkItem(workItemId);
 
-    public ValueTask FailWorkItem(int workItemId) => Db.FailWorkItem(workItemId);
+    public ValueTask FailWorkItem(int workItemId, int shard) => Db.FailWorkItem(workItemId);
 
-    public ValueTask PurgeWorkItems() => Db.PurgeWorkItems();
+    public ValueTask PurgeWorkItems(int shard) => Db.PurgeWorkItems();
 
     public ValueTask DeleteAllNQueueDataForUnitTests() => Db.DeleteAllNQueueDataForUnitTests();
 

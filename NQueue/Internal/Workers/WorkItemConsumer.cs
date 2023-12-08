@@ -22,8 +22,9 @@ namespace NQueue.Internal.Workers
         private readonly int _maxQueueRunners;
         private long _currentQueueRunners = 0;
         private readonly SpinWait _testingSpinWait = new();
+        private readonly int _shard;
 
-        public WorkItemConsumer(int maxQueueRunners, TimeSpan pollInterval, IWorkItemDbConnection workItemDbConnection,
+        public WorkItemConsumer(int maxQueueRunners, int shard, TimeSpan pollInterval, IWorkItemDbConnection workItemDbConnection,
             IHttpClientFactory httpClientFactory, NQueueServiceConfig config, ILoggerFactory loggerFactory) : base(
             pollInterval,
             typeof(WorkItemConsumer).FullName ?? "WorkItemConsumer",
@@ -31,6 +32,7 @@ namespace NQueue.Internal.Workers
             loggerFactory
         )
         {
+            _shard = shard;
             _workItemDbConnection = workItemDbConnection;
             _httpClientFactory = httpClientFactory;
             _config = config;
@@ -49,7 +51,7 @@ namespace NQueue.Internal.Workers
             try
             {
                 await _lock.WaitAsync();
-                request = await query.NextWorkItem();
+                request = await query.NextWorkItem(_shard);
             }
             finally
             {
@@ -58,7 +60,7 @@ namespace NQueue.Internal.Workers
 
             if (request == null)
             {
-                await query.PurgeWorkItems();
+                await query.PurgeWorkItems(_shard);
                 logger.Log(LogLevel.Debug, "no work items found");
                 return false;
             }
@@ -109,12 +111,12 @@ namespace NQueue.Internal.Workers
 
                     if (resp.IsSuccessStatusCode)
                     {
-                        await query.CompleteWorkItem(request.WorkItemId);
+                        await query.CompleteWorkItem(request.WorkItemId, _shard);
                         logger.Log(LogLevel.Information, "work item completed");
                     }
                     else
                     {
-                        await query.FailWorkItem(request.WorkItemId);
+                        await query.FailWorkItem(request.WorkItemId, _shard);
                         logger.Log(LogLevel.Warning,
                             $"work item, {httpReq.Method} {httpReq.RequestUri}, failed with status code {resp.StatusCode}");
                     }
@@ -123,7 +125,7 @@ namespace NQueue.Internal.Workers
                 catch (Exception e)
                 {
                     logger.LogError(e.ToString());
-                    await query.FailWorkItem(request.WorkItemId);
+                    await query.FailWorkItem(request.WorkItemId, _shard);
                     logger.Log(LogLevel.Information, "work item faulted");
                 }
             }

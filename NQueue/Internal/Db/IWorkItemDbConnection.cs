@@ -12,15 +12,17 @@ namespace NQueue.Internal.Db
         ValueTask<ICronTransaction> BeginTran();
         ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck();
         ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState();
+        int ShardCount { get; }
+        
     }
 
     internal interface IWorkItemDbProcs
     {
         ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson);
-        ValueTask<WorkItemInfo?> NextWorkItem();
-        ValueTask CompleteWorkItem(int workItemId);
-        ValueTask FailWorkItem(int workItemId);
-        ValueTask PurgeWorkItems();
+        ValueTask<WorkItemInfo?> NextWorkItem(int shard);
+        ValueTask CompleteWorkItem(int workItemId, int shard);
+        ValueTask FailWorkItem(int workItemId, int shard);
+        ValueTask PurgeWorkItems(int shard);
 
 
         ValueTask DeleteAllNQueueDataForUnitTests();

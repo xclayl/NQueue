@@ -18,7 +18,7 @@ namespace NQueue.Internal.Db.Postgres
         
         
         
-        public async ValueTask<WorkItemInfo?> NextWorkItem()
+        public async ValueTask<WorkItemInfo?> NextWorkItem(int shard)
         {
             await using var cnn = await _config.OpenDbConnection();
             var rows = ExecuteReader("SELECT * FROM nqueue.NextWorkItem($1)",
@@ -37,7 +37,7 @@ namespace NQueue.Internal.Db.Postgres
         }
 
 
-        public async ValueTask CompleteWorkItem(int workItemId)
+        public async ValueTask CompleteWorkItem(int workItemId, int shard)
         {
             await using var cnn = await _config.OpenDbConnection();
             await ExecuteProcedure(
@@ -48,7 +48,7 @@ namespace NQueue.Internal.Db.Postgres
             );
         }
 
-        public async ValueTask FailWorkItem(int workItemId)
+        public async ValueTask FailWorkItem(int workItemId, int shard)
         {
             await using var cnn = await _config.OpenDbConnection();
             await ExecuteProcedure(
@@ -68,7 +68,7 @@ namespace NQueue.Internal.Db.Postgres
         //     );
         // }
 
-        public async ValueTask PurgeWorkItems()
+        public async ValueTask PurgeWorkItems(int shard)
         {
             await using var cnn = await _config.OpenDbConnection();
             await ExecuteProcedure(

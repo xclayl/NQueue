@@ -108,6 +108,7 @@ namespace NQueue
             {
                 case DbServerTypes.SqlServer: return _workItemDbConnection = new SqlServerWorkItemDbConnection(this);
                 case DbServerTypes.Postgres: return _workItemDbConnection = new PostgresWorkItemDbConnection(this);
+                case DbServerTypes.PostgresCitus: throw new NotImplementedException(); // TODO
                 case DbServerTypes.InMemory: return _workItemDbConnection = _inMemoryWorkItemDbConnection;
                 default: throw new Exception($"Unknown DB Server type: {dbType}");
             }
@@ -155,7 +156,12 @@ namespace NQueue
                 {
                     case DbServerTypes.Postgres:
                         if (await IsPostgres(conn))
-                            return DbServerTypes.Postgres;
+                        {
+                            if (await IsPostgresCitus(conn))
+                                return DbServerTypes.PostgresCitus;
+                            else
+                                return DbServerTypes.Postgres;
+                        }
                         break;
                     case DbServerTypes.SqlServer:
                         if (await IsSqlServer(conn))
@@ -170,20 +176,41 @@ namespace NQueue
             
                 
         }
+        
+        
+        private static async ValueTask<bool> IsPostgresCitus(DbConnection conn)
+        {
+            /*
+               SELECT * FROM pg_available_extensions WHERE name = 'citus';
+
+               SELECT * FROM pg_extension WHERE extname = 'citus';
+            */
+            
+            var extension = (await
+                    AbstractWorkItemDb.ExecuteReader(
+                            "SELECT extname FROM pg_extension WHERE extname = 'citus'",
+                            conn, reader => reader.GetString(0))
+                        .ToListAsync())
+                .SingleOrDefault();
+
+            return extension == "citus";
+        }
 
         private static async ValueTask<bool> IsPostgres(DbConnection conn)
         {
+           
             try
             {
                 var val = (await
-                    AbstractWorkItemDb
-                        .ExecuteReader(
-                            "select character_value from information_schema.sql_implementation_info WHERE implementation_info_name = 'DBMS NAME'",
-                            conn, reader => reader.GetString(0))
-                        .ToListAsync())
+                        AbstractWorkItemDb.ExecuteReader(
+                                "select character_value from information_schema.sql_implementation_info WHERE implementation_info_name = 'DBMS NAME'",
+                                conn, reader => reader.GetString(0))
+                            .ToListAsync())
                     .SingleOrDefault();
 
                 return val == "PostgreSQL";
+
+
             }
             catch (Exception)
             {
@@ -214,6 +241,7 @@ namespace NQueue
         {
             SqlServer,
             Postgres,
+            PostgresCitus,
             InMemory
         }
 

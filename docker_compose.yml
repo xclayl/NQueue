@@ -42,8 +42,30 @@ services:
       timeout: 1s
       retries: 30
       start_period: 5s
-
- # redis:
+      
+      
+  pgsql-citus:
+    image: citusdata/citus:12-alpine
+    container_name: nqueue-pgsql-citus
+    command: [ "postgres", "-c", "log_statement=all", "-c", "log_destination=stderr" ]
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ihSH3jqeVb7giIgOkohX
+    ports:
+      - "15534:5432"
+    networks:
+      - mynet
+    volumes:
+      - nqueue-pgsql-citus-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d postgres -U postgres" ]
+      interval: 5s
+      timeout: 1s
+      retries: 30
+      start_period: 5s
+  
+  
+  # redis:
  #   image: redis:6-alpine
  #   container_name: nqueue-redis
  #   restart: unless-stopped
@@ -51,7 +73,6 @@ services:
  #     - "16379:6379"
 
 
-  
 
 
 networks:
@@ -65,3 +86,5 @@ volumes:
     name: nqueue-mssql-data
   nqueue-pgsql-data:
     name: nqueue-pgsql-data
+  nqueue-pgsql-citus-data:
+    name: nqueue-pgsql-citus-data

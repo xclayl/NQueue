@@ -53,10 +53,12 @@ namespace NQueue.Internal
 
 
                         using var workers = new DisposableList<IWorker>();
-                        
+
                         if (config.QueueRunners > 0)
-                            workers.Add( new WorkItemConsumer(config.QueueRunners, config.PollInterval, conn,
-                                _httpClientFactory, config, _loggerFactory));
+                            Enumerable.Range(0, conn.ShardCount).ToList().ForEach(shard =>
+                                workers.Add(new WorkItemConsumer(config.QueueRunners, shard, config.PollInterval, conn,
+                                    _httpClientFactory, config, _loggerFactory))
+                            );
                         
 
                         if (config.CronJobs.Any())

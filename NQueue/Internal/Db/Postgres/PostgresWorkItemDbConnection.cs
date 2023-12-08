@@ -73,6 +73,8 @@ namespace NQueue.Internal.Db.Postgres
             return await rows.ToListAsync();
         }
 
+        public int ShardCount => 1;
+
 
         public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()
         {

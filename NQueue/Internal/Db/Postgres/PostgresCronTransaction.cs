@@ -45,10 +45,10 @@ namespace NQueue.Internal.Db.Postgres
 
         public async ValueTask<int> CreateCronJob(string name)
         {
-            await ExecuteNonQuery(
-                _tran, 
-                "LOCK TABLE NQueue.CronJob IN SHARE ROW EXCLUSIVE MODE;"
-            );  
+            // await ExecuteNonQuery(
+            //     _tran, 
+            //     "LOCK TABLE NQueue.CronJob IN SHARE ROW EXCLUSIVE MODE;"
+            // );  
             
             await ExecuteNonQuery(
                 _tran, 

@@ -90,5 +90,6 @@ namespace NQueue.Internal.Db.SqlServer
             return (count == 0, count);
         }
 
+        public int ShardCount => 1;
     }
 }

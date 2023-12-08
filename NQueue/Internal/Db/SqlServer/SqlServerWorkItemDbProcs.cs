@@ -21,7 +21,7 @@ namespace NQueue.Internal.Db.SqlServer
 
 
 
-        public async ValueTask<WorkItemInfo?> NextWorkItem()
+        public async ValueTask<WorkItemInfo?> NextWorkItem(int shard)
         {
             await using var cnn = await _config.OpenDbConnection();
             var rows = ExecuteReader("EXEC [NQueue].[NextWorkItem] @Now=@Now",
@@ -40,7 +40,7 @@ namespace NQueue.Internal.Db.SqlServer
         }
 
 
-        public async ValueTask CompleteWorkItem(int workItemId)
+        public async ValueTask CompleteWorkItem(int workItemId, int shard)
         {
             await using var cnn = await _config.OpenDbConnection();
             await ExecuteNonQuery(
@@ -51,7 +51,7 @@ namespace NQueue.Internal.Db.SqlServer
             );
         }
 
-        public async ValueTask FailWorkItem(int workItemId)
+        public async ValueTask FailWorkItem(int workItemId, int shard)
         {
             await using var cnn = await _config.OpenDbConnection();
             await ExecuteNonQuery(
@@ -71,7 +71,7 @@ namespace NQueue.Internal.Db.SqlServer
         //     );
         // }
 
-        public async ValueTask PurgeWorkItems()
+        public async ValueTask PurgeWorkItems(int shard)
         {
             await using var cnn = await _config.OpenDbConnection();
             await ExecuteNonQuery(

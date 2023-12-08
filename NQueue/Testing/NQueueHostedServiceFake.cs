@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NQueue.Internal;
@@ -55,22 +56,31 @@ namespace NQueue.Testing
         /// </summary>
         public async ValueTask ProcessAll(Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
-            var consumer = new WorkItemConsumer(1,
-                TimeSpan.Zero,
-                await _config.GetWorkItemDbConnection(),
-                new MyHttpClientFactory(client),
-                _config,
-                loggerFactory);
-        
+            var conn = await _config.GetWorkItemDbConnection();
             
             var hasMore = true;
+
             while (hasMore)
             {
-                hasMore = await consumer.ExecuteOne();
-            }
-            
+                hasMore = false;
 
-            await consumer.WaitUntilNoActivity();
+                foreach (var shard in Enumerable.Range(0, conn.ShardCount))
+                {
+                    var consumer = new WorkItemConsumer(1,
+                        shard,
+                        TimeSpan.Zero,
+                        conn,
+                        new MyHttpClientFactory(client),
+                        _config,
+                        loggerFactory);
+
+
+                    while (await consumer.ExecuteOne())
+                        hasMore = true;
+                    
+                    await consumer.WaitUntilNoActivity();
+                }
+            }
         }
         
         /// <summary>
@@ -81,17 +91,27 @@ namespace NQueue.Testing
         /// </summary>
         public async ValueTask ProcessOne(Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
-            var consumer = new WorkItemConsumer(1,
-                TimeSpan.Zero,
-                await _config.GetWorkItemDbConnection(),
-                new MyHttpClientFactory(client),
-                _config,
-                loggerFactory);
-        
             
-            await consumer.ExecuteOne();
+            var conn = await _config.GetWorkItemDbConnection();
+            foreach (var shard in Enumerable.Range(0, conn.ShardCount))
+            {
+              
+                var consumer = new WorkItemConsumer(1,
+                    shard,
+                    TimeSpan.Zero,
+                    conn,
+                    new MyHttpClientFactory(client),
+                    _config,
+                    loggerFactory);
 
-            await consumer.WaitUntilNoActivity();
+
+                if (await consumer.ExecuteOne())
+                    break;
+
+                await consumer.WaitUntilNoActivity();
+            }
+            
+            
         }
 
 

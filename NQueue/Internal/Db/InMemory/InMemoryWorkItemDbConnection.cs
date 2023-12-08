@@ -40,5 +40,6 @@ namespace NQueue.Internal.Db.InMemory
             return (count == 0, count);
         }
 
+        public int ShardCount => 1;
     }
 }
