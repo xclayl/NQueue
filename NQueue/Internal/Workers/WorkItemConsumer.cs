@@ -2,8 +2,6 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -43,7 +41,7 @@ namespace NQueue.Internal.Workers
         protected internal override async ValueTask<bool> ExecuteOne()
         {
             var logger = CreateLogger();
-            logger.Log(LogLevel.Debug, "Looking for work");
+            logger.Log(LogLevel.Debug, "Looking for work {Shard}", _shard);
 
             WorkItemInfo? request;
             
@@ -61,7 +59,7 @@ namespace NQueue.Internal.Workers
             if (request == null)
             {
                 await query.PurgeWorkItems(_shard);
-                logger.Log(LogLevel.Debug, "no work items found");
+                logger.Log(LogLevel.Debug, "no work items found for shard {Shard}", _shard);
                 return false;
             }
             
@@ -112,13 +110,12 @@ namespace NQueue.Internal.Workers
                     if (resp.IsSuccessStatusCode)
                     {
                         await query.CompleteWorkItem(request.WorkItemId, _shard);
-                        logger.Log(LogLevel.Information, "work item completed");
+                        logger.Log(LogLevel.Information, "work item completed {Shard}", _shard);
                     }
                     else
                     {
                         await query.FailWorkItem(request.WorkItemId, _shard);
-                        logger.Log(LogLevel.Warning,
-                            $"work item, {httpReq.Method} {httpReq.RequestUri}, failed with status code {resp.StatusCode}");
+                        logger.Log(LogLevel.Warning, "work item, {HttpReqMethod} {HttpReqRequestUri}, failed with status code {RespStatusCode}. {Shard}", httpReq.Method, httpReq.RequestUri, resp.StatusCode, _shard);
                     }
 
                 }
@@ -126,7 +123,7 @@ namespace NQueue.Internal.Workers
                 {
                     logger.LogError(e.ToString());
                     await query.FailWorkItem(request.WorkItemId, _shard);
-                    logger.Log(LogLevel.Information, "work item faulted");
+                    logger.Log(LogLevel.Information, "work item faulted {Shard}", _shard);
                 }
             }
             finally
@@ -141,6 +138,7 @@ namespace NQueue.Internal.Workers
 
         internal async ValueTask WaitUntilNoActivity()
         {
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
             while (Interlocked.Read(ref _currentQueueRunners) > 0)
             {
                 _testingSpinWait.SpinOnce();
