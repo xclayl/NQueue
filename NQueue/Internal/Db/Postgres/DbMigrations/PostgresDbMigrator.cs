@@ -20,7 +20,7 @@ end; $$");
             
             var currentVersion = 0;
 
-            while (currentVersion != 2)
+            while (currentVersion != 3)
             {
                 
                 var dbObjects = await AbstractWorkItemDb.ExecuteReader(
