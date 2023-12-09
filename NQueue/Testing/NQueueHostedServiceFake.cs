@@ -75,7 +75,7 @@ namespace NQueue.Testing
                         loggerFactory);
 
 
-                    while (await consumer.ExecuteOne())
+                    while (await consumer.ExecuteOne(false))
                         hasMore = true;
                     
                     await consumer.WaitUntilNoActivity();
@@ -105,7 +105,7 @@ namespace NQueue.Testing
                     loggerFactory);
 
 
-                if (await consumer.ExecuteOne())
+                if (await consumer.ExecuteOne(false))
                 {
                     await consumer.WaitUntilNoActivity();
                     break;

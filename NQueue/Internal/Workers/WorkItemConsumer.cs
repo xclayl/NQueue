@@ -38,7 +38,14 @@ namespace NQueue.Internal.Workers
             _maxQueueRunners = maxQueueRunners;
         }
 
+
+
         protected internal override async ValueTask<bool> ExecuteOne()
+        {
+            return await ExecuteOne(true);
+        }
+
+        public async ValueTask<bool> ExecuteOne(bool runPurge)
         {
             var logger = CreateLogger();
             logger.Log(LogLevel.Debug, "Looking for work {Shard}", _shard);
@@ -58,7 +65,8 @@ namespace NQueue.Internal.Workers
 
             if (request == null)
             {
-                await query.PurgeWorkItems(_shard);
+                if (runPurge)
+                    await query.PurgeWorkItems(_shard);
                 logger.Log(LogLevel.Debug, "no work items found for shard {Shard}", _shard);
                 return false;
             }
