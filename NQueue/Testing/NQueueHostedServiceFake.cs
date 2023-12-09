@@ -106,9 +106,11 @@ namespace NQueue.Testing
 
 
                 if (await consumer.ExecuteOne())
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(10));
+                    await consumer.WaitUntilNoActivity();
                     break;
-
-                await consumer.WaitUntilNoActivity();
+                }
             }
             
             
