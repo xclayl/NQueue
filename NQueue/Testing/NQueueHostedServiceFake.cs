@@ -74,11 +74,16 @@ namespace NQueue.Testing
                         _config,
                         loggerFactory);
 
+                    var found = false;
 
                     while (await consumer.ExecuteOne(false))
+                        found = true;
+
+                    if (found)
+                    {
+                        await consumer.WaitUntilNoActivity();
                         hasMore = true;
-                    
-                    await consumer.WaitUntilNoActivity();
+                    }
                 }
             }
         }
@@ -107,6 +112,7 @@ namespace NQueue.Testing
 
                 if (await consumer.ExecuteOne(false))
                 {
+                    await Task.Delay(TimeSpan.FromMilliseconds(5));
                     await consumer.WaitUntilNoActivity();
                     break;
                 }
