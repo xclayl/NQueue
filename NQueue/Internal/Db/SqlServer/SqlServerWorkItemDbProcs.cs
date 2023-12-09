@@ -10,9 +10,9 @@ namespace NQueue.Internal.Db.SqlServer
 
     internal class SqlServerWorkItemDbProcs : SqlServerAbstractWorkItemDb, IWorkItemDbProcs
     {
-        private readonly NQueueServiceConfig _config;
+        private readonly IDbConfig _config;
 
-        public SqlServerWorkItemDbProcs(NQueueServiceConfig config) : base(config.TimeZone)
+        public SqlServerWorkItemDbProcs(IDbConfig config) : base(config.TimeZone)
         {
             _config = config;
         }
@@ -24,13 +24,14 @@ namespace NQueue.Internal.Db.SqlServer
         public async ValueTask<WorkItemInfo?> NextWorkItem(int shard)
         {
             await using var cnn = await _config.OpenDbConnection();
-            var rows = ExecuteReader("EXEC [NQueue].[NextWorkItem] @Now=@Now",
+            var rows = ExecuteReader("EXEC [NQueue].[NextWorkItem] @Shard=@Shard, @Now=@Now",
                 cnn,
                 reader => new WorkItemInfo(
                     reader.GetInt32(reader.GetOrdinal("WorkItemId")),
                     reader.GetString(reader.GetOrdinal("Url")),
                     !reader.IsDBNull(reader.GetOrdinal("Internal")) ? reader.GetString(reader.GetOrdinal("Internal")) : null
                 ),
+                SqlParameter("@Shard", shard),
                 SqlParameter("@Now", Now)
             );
 
@@ -44,9 +45,10 @@ namespace NQueue.Internal.Db.SqlServer
         {
             await using var cnn = await _config.OpenDbConnection();
             await ExecuteNonQuery(
-                "EXEC [NQueue].[CompleteWorkItem] @WorkItemID=@WorkItemID, @Now=@Now",
+                "EXEC [NQueue].[CompleteWorkItem] @WorkItemID=@WorkItemID, @Shard=@Shard, @Now=@Now",
                 cnn,
                 SqlParameter("@WorkItemID", workItemId),
+                SqlParameter("@Shard", shard),
                 SqlParameter("@Now", Now)
             );
         }
@@ -55,9 +57,10 @@ namespace NQueue.Internal.Db.SqlServer
         {
             await using var cnn = await _config.OpenDbConnection();
             await ExecuteNonQuery(
-                "EXEC [NQueue].[FailWorkItem] @WorkItemID=@WorkItemID, @Now=@Now",
+                "EXEC [NQueue].[FailWorkItem] @WorkItemID=@WorkItemID, @Shard=@Shard, @Now=@Now",
                 cnn,
                 SqlParameter("@WorkItemID", workItemId),
+                SqlParameter("@Shard", shard),
                 SqlParameter("@Now", Now)
             );
         }
@@ -75,8 +78,9 @@ namespace NQueue.Internal.Db.SqlServer
         {
             await using var cnn = await _config.OpenDbConnection();
             await ExecuteNonQuery(
-                "EXEC [NQueue].[PurgeWorkItems] @Now=@Now",
+                "EXEC [NQueue].[PurgeWorkItems] @Shard=@Shard, @Now=@Now",
                 cnn,
+                SqlParameter("@Shard", shard),
                 SqlParameter("@Now", Now)
             );
         }

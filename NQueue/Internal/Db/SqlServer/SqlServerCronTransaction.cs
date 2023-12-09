@@ -43,38 +43,35 @@ namespace NQueue.Internal.Db.SqlServer
         }
 
 
-        public async ValueTask<int> CreateCronJob(string name)
+        public async ValueTask CreateCronJob(string name)
         {
             await ExecuteNonQuery(
                 _tran, 
                 "SELECT TOP 1 * FROM [NQueue].CronJob cj WITH (UPDLOCK,HOLDLOCK,TABLOCK);"
             );
 
-            var rows = ExecuteReader(
+            await ExecuteNonQuery(
                 _tran, 
                 @"IF NOT EXISTS(SELECT * FROM [NQueue].CronJob cj WHERE cj.CronJobName = @CronJobName) 
                     BEGIN;
                         INSERT INTO [NQueue].CronJob ([CronJobName], [LastRanAt], [Active]) VALUES (@CronJobName,'2000-01-01',1);
-                    END;
-                    SELECT cj.CronJobId FROM [NQueue].CronJob cj WHERE cj.CronJobName = @CronJobName",
-                reader => reader.GetInt32(0),
+                    END;",
                 SqlParameter("@CronJobName", name)
             );
 
-            return (await rows.ToListAsync()).Single();
         }
 
-        public async ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(int cronJobId)
+        public async ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(string cronJobName)
         {
             var rowEnumerable = ExecuteReader(
                 _tran, 
-                "SELECT CONVERT(datetime, switchoffset ([LastRanAt], '+00:00')) AS LastRanAtUtc, Active FROM [NQueue].CronJob cj WITH (UPDLOCK,HOLDLOCK) WHERE CronJobId=@CronJobId",
+                "SELECT CONVERT(datetime, switchoffset ([LastRanAt], '+00:00')) AS LastRanAtUtc, Active FROM [NQueue].CronJob cj WITH (UPDLOCK,HOLDLOCK) WHERE CronJobName=@CronJobName",
                 reader => new
                 {
                     LastRanAt = new DateTimeOffset(reader.GetDateTime(0), TimeSpan.Zero),
                     Active = reader.GetBoolean(1),
                 },
-                SqlParameter("@CronJobId", cronJobId)
+                SqlParameter("@CronJobName", cronJobName)
             );
 
             var rows = await rowEnumerable.ToListAsync();
@@ -82,12 +79,12 @@ namespace NQueue.Internal.Db.SqlServer
             return (row.LastRanAt, row.Active);
         }
 
-        public async ValueTask UpdateCronJobLastRanAt(int cronJobId)
+        public async ValueTask UpdateCronJobLastRanAt(string cronJobName)
         {
             await ExecuteNonQuery(
                 _tran,
-                "UPDATE cj SET LastRanAt = @LastRanAt FROM [NQueue].CronJob cj WHERE CronJobId=@CronJobId",
-                SqlParameter("@CronJobId", cronJobId),
+                "UPDATE cj SET LastRanAt = @LastRanAt FROM [NQueue].CronJob cj WHERE CronJobName=@CronJobName",
+                SqlParameter("@CronJobName", cronJobName),
                 SqlParameter("@LastRanAt", Now)
             );
         }

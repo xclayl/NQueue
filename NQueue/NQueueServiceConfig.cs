@@ -14,7 +14,7 @@ using NQueue.Internal.Db.SqlServer;
 namespace NQueue
 {
 
-    public class NQueueServiceConfig
+    public class NQueueServiceConfig : IDbConfig
     {
         /// <summary>
         /// Maximum number of Work Items to be processed in parallel.  0 = disables queue processing.
@@ -79,7 +79,7 @@ namespace NQueue
             return conn;
         }
 
-        internal async ValueTask<DbConnection> OpenDbConnection()
+        public async ValueTask<DbConnection> OpenDbConnection()
         {
             if (CreateDbConnection == null)
                 throw new Exception("This should never happen, CreateDbConnection is null.");
@@ -107,8 +107,8 @@ namespace NQueue
             switch (dbType)
             {
                 case DbServerTypes.SqlServer: return _workItemDbConnection = new SqlServerWorkItemDbConnection(this);
-                case DbServerTypes.Postgres: return _workItemDbConnection = new PostgresWorkItemDbConnection(this);
-                case DbServerTypes.PostgresCitus: throw new NotImplementedException(); // TODO
+                case DbServerTypes.Postgres: return _workItemDbConnection = new PostgresWorkItemDbConnection(this, false);
+                case DbServerTypes.PostgresCitus: return _workItemDbConnection = new PostgresWorkItemDbConnection(this, true);
                 case DbServerTypes.InMemory: return _workItemDbConnection = _inMemoryWorkItemDbConnection;
                 default: throw new Exception($"Unknown DB Server type: {dbType}");
             }

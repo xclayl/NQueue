@@ -80,10 +80,9 @@ internal record class DbSchemaInfo(string Type, string Name)
         new("table", "WorkItemCompleted"),
     };
 
-    public static bool IsVersion02(IReadOnlyList<DbSchemaInfo> actual)
-    {
-        var expected = DbSchemaInfo.Version02;
 
+    private static bool IsVersion(IReadOnlyList<DbSchemaInfo> actual, IReadOnlyList<DbSchemaInfo> expected)
+    {
         if (expected.Count != actual.Count)
             return false;
 
@@ -98,5 +97,61 @@ internal record class DbSchemaInfo(string Type, string Name)
         return items.All(i => i.Expected.Type.Equals(i.Actual.Type, StringComparison.InvariantCultureIgnoreCase) 
                               && i.Expected.Name.Equals(i.Actual.Name, StringComparison.InvariantCultureIgnoreCase) );
     }
+
+    public static bool IsVersion02(IReadOnlyList<DbSchemaInfo> actual)
+    {
+        var expected = DbSchemaInfo.Version02;
+
+        return IsVersion(actual, expected);
+    }
+
     
+    
+    private static IReadOnlyList<DbSchemaInfo> Version03 => new DbSchemaInfo[]
+    {
+        new("column", "CronJob.Active"),
+        new("column", "CronJob.CronJobName"),
+        new("column", "CronJob.LastRanAt"),
+        new("column", "Queue.ErrorCount"),
+        new("column", "Queue.LockedUntil"),
+        new("column", "Queue.Name"),
+        new("column", "Queue.NextWorkItemId"),
+        new("column", "Queue.QueueId"),
+        new("column", "Queue.Shard"),
+        new("column", "WorkItem.CreatedAt"),
+        new("column", "WorkItem.DebugInfo"),
+        new("column", "WorkItem.Internal"),
+        new("column", "WorkItem.IsIngested"),
+        new("column", "WorkItem.LastAttemptedAt"),
+        new("column", "WorkItem.QueueName"),
+        new("column", "WorkItem.Url"),
+        new("column", "WorkItem.WorkItemId"),
+        new("column", "WorkItem.Shard"),
+        new("column", "WorkItemCompleted.CompletedAt"),
+        new("column", "WorkItemCompleted.CreatedAt"),
+        new("column", "WorkItemCompleted.DebugInfo"),
+        new("column", "WorkItemCompleted.Internal"),
+        new("column", "WorkItemCompleted.LastAttemptedAt"),
+        new("column", "WorkItemCompleted.QueueName"),
+        new("column", "WorkItemCompleted.Url"),
+        new("column", "WorkItemCompleted.WorkItemId"),
+        new("column", "WorkItemCompleted.Shard"),
+        new("routine", "CompleteWorkItem"),
+        new("routine", "EnqueueWorkItem"),
+        new("routine", "FailWorkItem"),
+        new("routine", "NextWorkItem"),
+        new("routine", "PurgeWorkItems"),
+        new("routine", "ReplayWorkItem"),
+        new("schema", "NQueue"),
+        new("table", "CronJob"),
+        new("table", "Queue"),
+        new("table", "WorkItem"),
+        new("table", "WorkItemCompleted"),
+    };
+    public static bool IsVersion03(IReadOnlyList<DbSchemaInfo> actual)
+    {
+        var expected = DbSchemaInfo.Version03;
+
+        return IsVersion(actual, expected);
+    }
 };

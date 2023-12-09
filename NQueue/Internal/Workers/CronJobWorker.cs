@@ -67,11 +67,11 @@ namespace NQueue.Internal.Workers
 
             if (state == null)
             {
-                var cronJobId = await tran.CreateCronJob(nQueueCronJob.Name);
-                state = new CronJobInfo(cronJobId, nQueueCronJob.Name, new DateTimeOffset(0, TimeSpan.Zero));
+                await tran.CreateCronJob(nQueueCronJob.Name);
+                state = new CronJobInfo(nQueueCronJob.Name, new DateTimeOffset(0, TimeSpan.Zero));
             }
 
-            var cron = await tran.SelectAndLockCronJob(state.CronJobId);
+            var cron = await tran.SelectAndLockCronJob(state.CronJobName);
 
             if (cron.active)
             {
@@ -84,9 +84,9 @@ namespace NQueue.Internal.Workers
                 var url = string.Format(nQueueCronJob.Url, nextOccurrence ?? Now(_tz));
 
                 await tran.EnqueueWorkItem(new Uri(url), nQueueCronJob.QueueName,
-                    $"From CronJob {state.CronJobId}", true);
+                    $"From CronJob {state.CronJobName}", true);
 
-                await tran.UpdateCronJobLastRanAt(state.CronJobId);
+                await tran.UpdateCronJobLastRanAt(state.CronJobName);
             }
 
             await tran.CommitAsync();

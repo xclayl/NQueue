@@ -1,12 +1,16 @@
-﻿using System.Data.Common;
+﻿using System;
+using System.Data.Common;
 using System.Threading.Tasks;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Microsoft.Data.SqlClient;
+using NQueue.Internal.Db;
+using NQueue.Internal.Db.Postgres;
+using NQueue.Internal.Db.SqlServer;
 
 namespace NQueue.Tests.DbTesting;
 
-public class SqlServerDbCreator : IDbCreator
+internal class SqlServerDbCreator : IDbCreator
 {
     private const string Password = "ihSH3jqeVb7giIgOkohX";
     private bool _dbCreated = false;
@@ -21,6 +25,16 @@ public class SqlServerDbCreator : IDbCreator
                 .UntilPortIsAvailable(1433))
         .Build();
 
+    
+    public async ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection()
+    {
+        await EnsureDbCreated();
+        return new SqlServerWorkItemDbConnection(new SqlServerDbConfig
+        {
+            TimeZone = TimeZoneInfo.Local,
+            Cnn = UserConnectionString("nqueue_test")
+        });
+    }
     
     private string OwnerConnectionString(string db) =>
         $"User ID=sa;Password={Password};Data Source=localhost,{_postgreSqlContainer.GetMappedPublicPort(1433)};Database={db};TrustServerCertificate=True";

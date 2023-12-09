@@ -9,7 +9,7 @@ namespace NQueue.Internal.Db.Postgres.DbMigrations
     {
         
         
-        public static async ValueTask UpdateDbSchema(DbConnection conn)
+        public static async ValueTask UpdateDbSchema(DbConnection conn, bool isCitus)
         {
             
             await using var tran = await conn.BeginTransactionAsync();
@@ -47,6 +47,10 @@ end; $$");
 
                     currentVersion = 0;
                 }
+                else if (DbSchemaInfo.IsVersion03(dbObjects))
+                {
+                    currentVersion = 3;
+                }
                 else if (DbSchemaInfo.IsVersion02(dbObjects))
                 {
                     currentVersion = 2;
@@ -69,9 +73,14 @@ end; $$");
                 {
                     await new PostgresDbUpgrader02().Upgrade(tran);
                 }
+                if (currentVersion == 2)
+                {
+                    await new PostgresDbUpgrader03().Upgrade(tran, isCitus);
+                }
             }
 
             await tran.CommitAsync();
+            
         }
     }
 }

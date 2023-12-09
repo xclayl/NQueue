@@ -11,11 +11,11 @@ namespace NQueue.Internal.Db.Postgres
 {
     internal class PostgresWorkItemDbConnection : PostgresAbstractWorkItemDb, IWorkItemDbConnection
     {
-        private readonly NQueueServiceConfig _config;
+        private readonly IDbConfig _config;
         private readonly SemaphoreSlim _lock = new(1, 1);
         private volatile bool _dbMigrationRan;
     
-        public PostgresWorkItemDbConnection(NQueueServiceConfig config): base(config.TimeZone)
+        public PostgresWorkItemDbConnection(IDbConfig config, bool isCitus): base(config.TimeZone, isCitus)
         {
             _config = config;
         }
@@ -24,14 +24,14 @@ namespace NQueue.Internal.Db.Postgres
         public async ValueTask<IWorkItemDbProcs> Get()
         {
             await EnsureDbMigrationRuns();
-            return new PostgresWorkItemDbProcs(_config);
+            return new PostgresWorkItemDbProcs(_config, IsCitus);
         }
 
         public async ValueTask<ICronTransaction> BeginTran()
         {
             await EnsureDbMigrationRuns();
             var conn = await _config.OpenDbConnection();
-            return new PostgresCronTransaction(await conn.BeginTransactionAsync(), conn, _config.TimeZone);
+            return new PostgresCronTransaction(await conn.BeginTransactionAsync(), conn, _config.TimeZone, IsCitus);
         }
 
         private async ValueTask EnsureDbMigrationRuns()
@@ -44,7 +44,7 @@ namespace NQueue.Internal.Db.Postgres
                     if (!_dbMigrationRan)
                     {
                         await using var conn = await _config.OpenDbConnection();
-                        await PostgresDbMigrator.UpdateDbSchema(conn);
+                        await PostgresDbMigrator.UpdateDbSchema(conn, IsCitus);
     
                         _dbMigrationRan = true;
                     }
@@ -62,18 +62,17 @@ namespace NQueue.Internal.Db.Postgres
             await EnsureDbMigrationRuns();
             await using var cnn = await _config.OpenDbConnection();
             var rows = ExecuteReader(
-                "SELECT CronJobId, CronJobName, LastRanAt FROM NQueue.CronJob", 
+                "SELECT CronJobName, LastRanAt FROM NQueue.CronJob", 
                 cnn,
                 reader => new CronJobInfo(
-                    reader.GetInt32(0),
-                    reader.GetString(1),
-                    new DateTimeOffset(reader.GetDateTime(2), TimeSpan.Zero)
+                    reader.GetString(0),
+                    new DateTimeOffset(reader.GetDateTime(1), TimeSpan.Zero)
                 ));
 
             return await rows.ToListAsync();
         }
 
-        public int ShardCount => 1;
+        public int ShardCount => IsCitus ? 16 : 1;
 
 
         public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()

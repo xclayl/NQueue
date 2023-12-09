@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,9 +8,9 @@ namespace NQueue.Internal.Db.Postgres
 {
     internal class PostgresWorkItemDbProcs : PostgresAbstractWorkItemDb, IWorkItemDbProcs
     {
-        private readonly NQueueServiceConfig _config;
+        private readonly IDbConfig _config;
     
-        public PostgresWorkItemDbProcs(NQueueServiceConfig config): base(config.TimeZone)
+        public PostgresWorkItemDbProcs(IDbConfig config, bool isCitus): base(config.TimeZone, isCitus)
         {
             _config = config;
         }
@@ -21,13 +20,14 @@ namespace NQueue.Internal.Db.Postgres
         public async ValueTask<WorkItemInfo?> NextWorkItem(int shard)
         {
             await using var cnn = await _config.OpenDbConnection();
-            var rows = ExecuteReader("SELECT * FROM nqueue.NextWorkItem($1)",
+            var rows = ExecuteReader("SELECT * FROM nqueue.NextWorkItem($1, $2)",
                 cnn,
                 reader => new WorkItemInfo(
                     reader.GetInt32(reader.GetOrdinal("WorkItemId")),
                     reader.GetString(reader.GetOrdinal("Url")),
                     !reader.IsDBNull(reader.GetOrdinal("Internal")) ? reader.GetString(reader.GetOrdinal("Internal")) : null
                 ),
+                SqlParameter(shard),
                 SqlParameter(NowUtc)
             );
 
@@ -44,6 +44,7 @@ namespace NQueue.Internal.Db.Postgres
                 "nqueue.CompleteWorkItem",
                 cnn,
                 SqlParameter(workItemId),
+                SqlParameter(shard),
                 SqlParameter(NowUtc)
             );
         }
@@ -55,6 +56,7 @@ namespace NQueue.Internal.Db.Postgres
                 "nqueue.FailWorkItem",
                 cnn,
                 SqlParameter(workItemId),
+                SqlParameter(shard),
                 SqlParameter(NowUtc)
             );
         }
@@ -74,6 +76,7 @@ namespace NQueue.Internal.Db.Postgres
             await ExecuteProcedure(
                 "nqueue.PurgeWorkItems",
                 cnn,
+                SqlParameter(shard),
                 SqlParameter(NowUtc)
             );
         }

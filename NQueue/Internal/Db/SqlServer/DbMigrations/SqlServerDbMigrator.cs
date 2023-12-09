@@ -51,6 +51,10 @@ END
 
                     currentVersion = 0;
                 }
+                else if (DbSchemaInfo.IsVersion03(dbObjects))
+                {
+                    currentVersion = 3;
+                }
                 else if (DbSchemaInfo.IsVersion02(dbObjects))
                 {
                     currentVersion = 2;
@@ -72,6 +76,10 @@ END
                 if (currentVersion == 1)
                 {
                     await new SqlServerDbUpgrader02().Upgrade(tran);
+                }
+                if (currentVersion == 2)
+                {
+                    await new SqlServerDbUpgrader03().Upgrade(tran);
                 }
             }
 

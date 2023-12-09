@@ -10,7 +10,7 @@ namespace NQueue.Internal.Db.Postgres
         private readonly DbTransaction _tran;
         private readonly DbConnection _conn;
 
-        public PostgresCronTransaction(DbTransaction tran, DbConnection conn, TimeZoneInfo tz): base(tz)
+        public PostgresCronTransaction(DbTransaction tran, DbConnection conn, TimeZoneInfo tz, bool isCitus): base(tz, isCitus)
         {
             _tran = tran;
             _conn = conn;
@@ -43,7 +43,7 @@ namespace NQueue.Internal.Db.Postgres
         }
 
 
-        public async ValueTask<int> CreateCronJob(string name)
+        public async ValueTask CreateCronJob(string name)
         {
             // await ExecuteNonQuery(
             //     _tran, 
@@ -56,27 +56,19 @@ namespace NQueue.Internal.Db.Postgres
                 SqlParameter(name)
             );
 
-            var rows = ExecuteReader(
-                _tran, 
-                @"SELECT cj.CronJobId FROM NQueue.CronJob cj WHERE cj.CronJobName = $1",
-                reader => reader.GetInt32(0),
-                SqlParameter(name)
-            );
-
-            return (await rows.ToListAsync()).Single();
         }
 
-        public async ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(int cronJobId)
+        public async ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(string cronJobName)
         {
             var rowEnumerable = ExecuteReader(
                 _tran, 
-                "SELECT LastRanAt, Active FROM NQueue.CronJob cj WHERE CronJobId=$1 FOR UPDATE",
+                "SELECT LastRanAt, Active FROM NQueue.CronJob cj WHERE CronJobName=$1 FOR UPDATE",
                 reader => new
                 {
                     LastRanAt = new DateTimeOffset(reader.GetDateTime(0), TimeSpan.Zero),
                     Active = reader.GetBoolean(1),
                 },
-                SqlParameter(cronJobId)
+                SqlParameter(cronJobName)
             );
 
             var rows = await rowEnumerable.ToListAsync();
@@ -84,12 +76,12 @@ namespace NQueue.Internal.Db.Postgres
             return (row.LastRanAt, row.Active);
         }
 
-        public async ValueTask UpdateCronJobLastRanAt(int cronJobId)
+        public async ValueTask UpdateCronJobLastRanAt(string cronJobName)
         {
             await ExecuteNonQuery(
                 _tran,
-                "UPDATE NQueue.CronJob cj SET LastRanAt = $2 WHERE CronJobId=$1",
-                SqlParameter(cronJobId),
+                "UPDATE NQueue.CronJob cj SET LastRanAt = $2 WHERE CronJobName=$1",
+                SqlParameter(cronJobName),
                 SqlParameter(NowUtc)
             );
         }

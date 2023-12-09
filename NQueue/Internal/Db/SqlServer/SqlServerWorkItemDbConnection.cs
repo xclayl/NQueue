@@ -14,11 +14,11 @@ namespace NQueue.Internal.Db.SqlServer
 
     internal class SqlServerWorkItemDbConnection : SqlServerAbstractWorkItemDb, IWorkItemDbConnection
     {
-        private readonly NQueueServiceConfig _config;
+        private readonly IDbConfig _config;
         private readonly SemaphoreSlim _lock = new(1, 1);
         private volatile bool _dbMigrationRan;
 
-        internal SqlServerWorkItemDbConnection(NQueueServiceConfig config): base(config.TimeZone)
+        internal SqlServerWorkItemDbConnection(IDbConfig config): base(config.TimeZone)
         {
             _config = config;
         }
@@ -64,12 +64,11 @@ namespace NQueue.Internal.Db.SqlServer
             await EnsureDbMigrationRuns();
             await using var cnn = await _config.OpenDbConnection();
             var rows = ExecuteReader(
-                "SELECT [CronJobId], [CronJobName], CONVERT(datetime, switchoffset ([LastRanAt], '+00:00')) AS LastRanAtUtc FROM [NQueue].CronJob",
+                "SELECT [CronJobName], CONVERT(datetime, switchoffset ([LastRanAt], '+00:00')) AS LastRanAtUtc FROM [NQueue].CronJob",
                 cnn,
                 reader => new CronJobInfo(
-                    reader.GetInt32(0),
-                    reader.GetString(1),
-                    new DateTimeOffset(reader.GetDateTime(2), TimeSpan.Zero)
+                    reader.GetString(0),
+                    new DateTimeOffset(reader.GetDateTime(1), TimeSpan.Zero)
                 ));
 
             return await rows.ToListAsync();

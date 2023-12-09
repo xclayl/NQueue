@@ -1,43 +1,44 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging;
 using NQueue.Testing;
+using OpenTelemetry.Logs;
 
 namespace NQueue.Tests;
 
-internal class SampleWebAppBuilder : IAsyncDisposable
+internal class FakeWebApp
 {
-    public SampleWebAppBuilder(WebApplicationFactory<Program> application, NQueueHostedServiceFake fakeService)
-    {
-        Application = application;
-        FakeService = fakeService;
-    }
 
-    public WebApplicationFactory<Program> Application { get; }
-    public NQueueHostedServiceFake FakeService { get; }
+    public readonly List<LogRecord> FakeLogs = new();
+    public NQueueHostedServiceFake FakeService { get; set; }
     
-    internal static async ValueTask<SampleWebAppBuilder> Build(IDbCreator dbCreator)
-    {
-        
-        var baseUrl = new Uri("http://localhost:8501");
-        var fakeService = new NQueueHostedServiceFake(dbCreator.CreateConnection, baseUrl);
-        await fakeService.DeleteAllNQueueData();
-        
-        return new SampleWebAppBuilder(new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.UseUrls(baseUrl.AbsoluteUri);
-                builder.ConfigureServices(services =>
-                {
-                    services.RemoveNQueueHostedService();
-                    services.AddNQueueHostedService(fakeService);
-                });
-            }), fakeService);
-    }
+ 
 
-    public async ValueTask DisposeAsync()
+}
+
+
+internal static class FakeWebAppExtension
+{
+    public static void ConfigureFakes(this IWebHostBuilder builder, FakeWebApp fakeWebApp, Uri baseUrl)
     {
-        await Application.DisposeAsync();
+        
+
+        builder.UseUrls(baseUrl.AbsoluteUri);
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveNQueueHostedService();
+            services.AddNQueueHostedService(fakeWebApp.FakeService);
+        });
+        builder.ConfigureLogging(l =>
+        {
+            l.ClearProviders();
+            l.AddOpenTelemetry(t =>
+            {
+                t.AddInMemoryExporter(fakeWebApp.FakeLogs);
+            });
+        });
     }
 }

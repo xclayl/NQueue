@@ -4,12 +4,14 @@ using System.Data.Common;
 
 namespace NQueue.Internal.Db.Postgres
 {
-    internal class PostgresAbstractWorkItemDb : AbstractWorkItemDb
+    internal abstract class PostgresAbstractWorkItemDb : AbstractWorkItemDb
     {
         TimeZoneInfo _utc = TimeZoneInfo.Utc;
+        protected readonly bool IsCitus;
         
-        public PostgresAbstractWorkItemDb(TimeZoneInfo tz) : base(tz)
+        protected PostgresAbstractWorkItemDb(TimeZoneInfo tz, bool isCitus) : base(tz)
         {
+            IsCitus = isCitus;
         }
         
         

@@ -9,13 +9,13 @@ using NQueue.Internal.Db.Postgres;
 
 namespace NQueue.Tests.DbTesting;
 
-internal class PostgresDbCreator : IDbCreator
+internal class PostgresCitusDbCreator : IDbCreator
 {
     private const string Password = "ihSH3jqeVb7giIgOkohX";
     private bool _dbCreated = false;
     
     private readonly IContainer _postgreSqlContainer = new ContainerBuilder()
-        .WithImage("postgres:15-alpine3.17")
+        .WithImage("citusdata/citus:12-alpine")
         .WithEnvironment("POSTGRES_PASSWORD", Password)
         .WithPortBinding(5432, true)
         .WithWaitStrategy(
@@ -23,7 +23,6 @@ internal class PostgresDbCreator : IDbCreator
                 .UntilPortIsAvailable(5432))
         .Build();
 
-    
 
     public async ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection()
     {
@@ -32,9 +31,9 @@ internal class PostgresDbCreator : IDbCreator
         {
             TimeZone = TimeZoneInfo.Local,
             Cnn = UserConnectionString("nqueue_test")
-        }, false);
+        }, true);
     }
-
+    
     private string OwnerConnectionString(string db) =>
         $"User ID=postgres;Password={Password};Host=localhost;Port={_postgreSqlContainer.GetMappedPublicPort(5432)};Database={db}";
     private string UserConnectionString(string user) =>
@@ -58,6 +57,7 @@ internal class PostgresDbCreator : IDbCreator
         {
             await _postgreSqlContainer.StartAsync();
             await ExecuteNonQuery("CREATE DATABASE nqueue_test");
+            await ExecuteNonQuery("CREATE EXTENSION citus", "nqueue_test");
             await ExecuteNonQuery($"CREATE USER nqueue_user PASSWORD '{Password}';", "nqueue_test");
             await ExecuteNonQuery("CREATE SCHEMA IF NOT EXISTS nqueue AUTHORIZATION nqueue_user", "nqueue_test");
         }

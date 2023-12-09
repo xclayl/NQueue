@@ -32,9 +32,9 @@ namespace NQueue.Internal.Db
     {
         ValueTask CommitAsync();
         ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection);
-        ValueTask<int> CreateCronJob(string name);
-        ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(int cronJobId);
-        ValueTask UpdateCronJobLastRanAt(int cronJobId);
+        ValueTask CreateCronJob(string name);
+        ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(string cronJobName);
+        ValueTask UpdateCronJobLastRanAt(string cronJobName);
         
     }
 }

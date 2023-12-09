@@ -80,7 +80,7 @@ class CronWorkItemTran : ICronTransaction
 
         foreach (var tempCj in _tempCronJobState)
         {
-            var cj = _cronJobState.SingleOrDefault(j => j.CronJobId == tempCj.CronJobId);
+            var cj = _cronJobState.SingleOrDefault(j => j.CronJobName == tempCj.CronJobName);
             if (cj != null)
                 _cronJobState.Remove(cj);
 
@@ -112,42 +112,41 @@ class CronWorkItemTran : ICronTransaction
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask<int> CreateCronJob(string name)
+    public async ValueTask CreateCronJob(string name)
     {
         if (_lockAcquired)
             throw new Exception("In memory cron lock should not be acquired");
 
         using var _ = await ALock.Wait(_lock);
         
-        var cronJobId = _nextId();
-        _tempCronJobState.Add(new CronJobInfo(cronJobId, name,
+        _tempCronJobState.Add(new CronJobInfo(name,
             new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero)));
-        return cronJobId;
+        
     }
 
-    public async ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(int cronJobId)
+    public async ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(string cronJobName)
     {
         await _lock.WaitAsync();
         _lockAcquired = true;
         
-        var cj = _tempCronJobState.SingleOrDefault(j => j.CronJobId == cronJobId);
+        var cj = _tempCronJobState.SingleOrDefault(j => j.CronJobName == cronJobName);
         if (cj == null)
         {
-            cj = _cronJobState.Single(j => j.CronJobId == cronJobId);
+            cj = _cronJobState.Single(j => j.CronJobName == cronJobName);
             _tempCronJobState.Add(cj);
         }
         
         return (cj.LastRanAt, true);
     }
 
-    public ValueTask UpdateCronJobLastRanAt(int cronJobId)
+    public ValueTask UpdateCronJobLastRanAt(string cronJobName)
     {
         if (!_lockAcquired)
             throw new Exception("In memory cron lock not acquired");
        
-        var cj = _tempCronJobState.Single(j => j.CronJobId == cronJobId);
+        var cj = _tempCronJobState.Single(j => j.CronJobName == cronJobName);
         _tempCronJobState.Remove(cj);
-        var newCj = new CronJobInfo(cj.CronJobId, cj.CronJobName, DateTimeOffset.Now);
+        var newCj = new CronJobInfo(cj.CronJobName, DateTimeOffset.Now);
         _tempCronJobState.Add(newCj);
     
 

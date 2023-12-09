@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NQueue.Internal;
 using NQueue.Testing;
+
+[assembly: InternalsVisibleTo("NQueue.Tests")]
 
 namespace NQueue
 {
