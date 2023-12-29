@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Cronos;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace NQueue.Internal
 {
@@ -17,21 +19,30 @@ namespace NQueue.Internal
         private NQueueServiceConfig? _config;
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
         private readonly IServiceProvider? _serviceProvider;
+        private volatile bool _ready = false; 
 
         public ConfigFactory(Func<IServiceProvider, NQueueServiceConfig, ValueTask> configBuilder,
             IServiceProvider serviceProvider)
         {
             _configBuilder = configBuilder;
             _serviceProvider = serviceProvider;
+            _serviceProvider.GetRequiredService<IHostApplicationLifetime>().ApplicationStarted
+                .Register(() => _ready = true);
         }
 
         public ConfigFactory(NQueueServiceConfig config)
         {
             _config = config;
+            _ready = true;
         }
 
         public async ValueTask<NQueueServiceConfig> GetConfig()
         {
+            while (!_ready)
+            {
+                await Task.Delay(1_000);
+            }
+            
             await _lock.WaitAsync();
             try
             {
