@@ -4,6 +4,7 @@ using System.Data.Common;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
+using System.Security.AccessControl;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NQueue.Internal;
@@ -20,6 +21,8 @@ namespace NQueue.Testing
     {
         private readonly NQueueServiceConfig _config;
         private readonly NQueueServiceFake _service;
+        private readonly List<Uri> _externalBaseUrls = new();
+        private readonly List<Uri> _externalUrlCalls = new();
 
         public NQueueHostedServiceFake(Uri? baseUri = null) : this(() => ValueTask.FromResult((DbConnection?)null), baseUri)
         {
@@ -47,6 +50,22 @@ namespace NQueue.Testing
             set => _config.LocalHttpAddresses = new List<string> { value.AbsoluteUri };
         }
 
+        /// <summary>
+        /// Add base URLs to external systems so that this Fake does not hit them during tests.
+        /// When this fake encounters a URL that matches one of the base URLs, it'll log it
+        /// in the ExternalUrlsCalls property.
+        /// </summary>
+        public void AddExternalBaseUrls(IReadOnlyList<Uri> urls)
+        {
+            _externalBaseUrls.AddRange(urls);
+        }
+
+        /// <summary>
+        /// When AddExternalBaseUrls is given URLs, then this list will be populated with any Work Item urls that
+        /// match them (instead of making an HTTP request).
+        /// </summary>
+        public IList<Uri> ExternalUrlsCalls => _externalUrlCalls;
+        
 
         /// <summary>
         /// Wait and process all work items.  Runs until there are no Work Items to immediately take.
@@ -76,7 +95,7 @@ namespace NQueue.Testing
 
                     var found = false;
 
-                    while (await consumer.ExecuteOne(false))
+                    while (await consumer.ExecuteOne(false, _externalBaseUrls, _externalUrlCalls))
                         found = true;
 
                     if (found)
@@ -110,7 +129,7 @@ namespace NQueue.Testing
                     loggerFactory);
 
 
-                if (await consumer.ExecuteOne(false))
+                if (await consumer.ExecuteOne(false, _externalBaseUrls, _externalUrlCalls))
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(5));
                     await consumer.WaitUntilNoActivity();

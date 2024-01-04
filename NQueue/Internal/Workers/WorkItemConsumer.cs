@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
@@ -42,10 +43,10 @@ namespace NQueue.Internal.Workers
 
         protected internal override async ValueTask<bool> ExecuteOne()
         {
-            return await ExecuteOne(true);
+            return await ExecuteOne(true, Array.Empty<Uri>(), Array.Empty<Uri>());
         }
 
-        public async ValueTask<bool> ExecuteOne(bool runPurge)
+        public async ValueTask<bool> ExecuteOne(bool runPurge, IReadOnlyList<Uri> testBaseUrls, IList<Uri> testCalls)
         {
             var logger = CreateLogger();
             logger.Log(LogLevel.Debug, "Looking for work {Shard}", _shard);
@@ -72,7 +73,10 @@ namespace NQueue.Internal.Workers
             }
             
 
-            ExecuteWorkItem(request, query, logger);
+            if (testBaseUrls.Any(u => request.Url.StartsWith(u.AbsoluteUri)))
+                testCalls.Add(new Uri(request.Url));
+            else
+                ExecuteWorkItem(request, query, logger);
 
             return true;
         }
