@@ -59,26 +59,37 @@ namespace NQueue.Internal.Workers
             var query = await _workItemDbConnection.Get();
             try
             {
-                await _concurrentShardLock.Item.WaitAsync();
+                await _lock.WaitAsync();
                 try
                 {
-                    await _lock.WaitAsync();
+                    await _concurrentShardLock.Item.WaitAsync();
                     request = await query.NextWorkItem(_shard);
                 }
                 finally
                 {
-                    _lock.Release();
+                    _concurrentShardLock.Item.Release();
                 }
             }
             finally
             {
-                _concurrentShardLock.Item.Release();
+                _lock.Release();
             }
 
             if (request == null)
             {
                 if (runPurge)
-                    await query.PurgeWorkItems(_shard);
+                {
+                    try
+                    {
+                        await _concurrentShardLock.Item.WaitAsync();  
+                        await query.PurgeWorkItems(_shard);
+                    }
+                    finally
+                    {
+                        _concurrentShardLock.Item.Release();
+                    }
+                }
+
                 logger.Log(LogLevel.Debug, "no work items found for shard {Shard}", _shard);
                 return false;
             }
