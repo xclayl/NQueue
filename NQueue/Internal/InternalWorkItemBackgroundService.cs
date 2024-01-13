@@ -55,11 +55,14 @@ namespace NQueue.Internal
                         using var workers = new DisposableList<IWorker>();
 
                         if (config.QueueRunners > 0)
+                        {
+                            var shardLock = new SharedDisposableRef<SemaphoreSlim>(new SemaphoreSlim(config.MaxParallelShards ?? 16, config.MaxParallelShards ?? 16));
                             Enumerable.Range(0, conn.ShardCount).ToList().ForEach(shard =>
                                 workers.Add(new WorkItemConsumer(config.QueueRunners, shard, config.PollInterval, conn,
-                                    _httpClientFactory, config, _loggerFactory))
+                                    _httpClientFactory, config, _loggerFactory, shardLock.Share()))
                             );
-                        
+                        }
+
 
                         if (config.CronJobs.Any())
                             workers.Add(new CronJobWorker(conn, config.TimeZone, _configFactory,

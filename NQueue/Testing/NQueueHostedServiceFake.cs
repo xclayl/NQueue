@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Security.AccessControl;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NQueue.Internal;
@@ -82,6 +83,8 @@ namespace NQueue.Testing
             while (hasMore)
             {
                 hasMore = false;
+                
+                var shardLock = new SharedDisposableRef<SemaphoreSlim>(new SemaphoreSlim(1, 1));
 
                 foreach (var shard in Enumerable.Range(0, conn.ShardCount))
                 {
@@ -91,7 +94,8 @@ namespace NQueue.Testing
                         conn,
                         new MyHttpClientFactory(client),
                         _config,
-                        loggerFactory);
+                        loggerFactory,
+                        shardLock.Share());
 
                     var found = false;
 
@@ -117,6 +121,8 @@ namespace NQueue.Testing
         {
             
             var conn = await _config.GetWorkItemDbConnection();
+            
+            var shardLock = new SharedDisposableRef<SemaphoreSlim>(new SemaphoreSlim(1, 1));
             foreach (var shard in Enumerable.Range(0, conn.ShardCount))
             {
               
@@ -126,7 +132,8 @@ namespace NQueue.Testing
                     conn,
                     new MyHttpClientFactory(client),
                     _config,
-                    loggerFactory);
+                    loggerFactory,
+                    shardLock.Share());
 
 
                 if (await consumer.ExecuteOne(false, _externalBaseUrls, _externalUrlCalls))

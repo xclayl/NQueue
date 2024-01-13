@@ -17,12 +17,20 @@ namespace NQueue
     public class NQueueServiceConfig : IDbConfig
     {
         /// <summary>
-        /// Maximum number of Work Items to be processed in parallel.  0 = disables queue processing.
+        /// Maximum number of Work Items to be processed in parallel (per Shard).  0 = disables queue processing.
         /// Feel free to use a ridiculous number, like 1_000_000.
         /// If this is zero, Cron Jobs will not be processed (by this app)
         /// Default = 1
         /// </summary>
         public int QueueRunners { get; set; } = 1;
+        /// <summary>
+        /// Maximum number of Shards to be hit the DB looking for work in parallel.  null = infinite.
+        /// Currently there are either 1 or 16 shards.  16 is only used by the Citus databases.
+        /// So a number above 16 has no impact, and for other databases, 1 is the only number that
+        /// makes sense.
+        /// Default = null/infinite
+        /// </summary>
+        public int? MaxParallelShards { get; set; } = null;
         /// <summary>
         /// The amount of time to wait until querying the DB again to look for Work Items.
         /// If a Work Item was found previously, this is ignored, and NQueue immediately

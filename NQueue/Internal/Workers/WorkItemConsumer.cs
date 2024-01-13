@@ -22,9 +22,11 @@ namespace NQueue.Internal.Workers
         private long _currentQueueRunners = 0;
         private readonly SpinWait _testingSpinWait = new();
         private readonly int _shard;
+        private readonly ISharedDisposableRefItem<SemaphoreSlim> _concurrentShardLock;
 
         public WorkItemConsumer(int maxQueueRunners, int shard, TimeSpan pollInterval, IWorkItemDbConnection workItemDbConnection,
-            IHttpClientFactory httpClientFactory, NQueueServiceConfig config, ILoggerFactory loggerFactory) : base(
+            IHttpClientFactory httpClientFactory, NQueueServiceConfig config, ILoggerFactory loggerFactory,
+            ISharedDisposableRefItem<SemaphoreSlim> concurrentShardLock) : base(
             pollInterval,
             typeof(WorkItemConsumer).FullName ?? "WorkItemConsumer",
             config.TimeZone,
@@ -37,6 +39,7 @@ namespace NQueue.Internal.Workers
             _config = config;
             _lock = new SemaphoreSlim(maxQueueRunners, maxQueueRunners);
             _maxQueueRunners = maxQueueRunners;
+            _concurrentShardLock = concurrentShardLock;
         }
 
 
@@ -56,12 +59,20 @@ namespace NQueue.Internal.Workers
             var query = await _workItemDbConnection.Get();
             try
             {
-                await _lock.WaitAsync();
-                request = await query.NextWorkItem(_shard);
+                await _concurrentShardLock.Item.WaitAsync();
+                try
+                {
+                    await _lock.WaitAsync();
+                    request = await query.NextWorkItem(_shard);
+                }
+                finally
+                {
+                    _lock.Release();
+                }
             }
             finally
             {
-                _lock.Release();
+                _concurrentShardLock.Item.Release();
             }
 
             if (request == null)
@@ -93,6 +104,7 @@ namespace NQueue.Internal.Workers
                     _lock.Wait(timeout);
             });
             _lock.Dispose();
+            _concurrentShardLock.Dispose();
         }
 
 
