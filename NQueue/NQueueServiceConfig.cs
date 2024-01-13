@@ -23,14 +23,7 @@ namespace NQueue
         /// Default = 1
         /// </summary>
         public int QueueRunners { get; set; } = 1;
-        /// <summary>
-        /// Maximum number of Shards to be hit the DB looking for work in parallel.  null = infinite.
-        /// Currently there are either 1 or 16 shards.  16 is only used by the Citus databases.
-        /// So a number above 16 has no impact, and for other databases, 1 is the only number that
-        /// makes sense.
-        /// Default = null/infinite
-        /// </summary>
-        public int? MaxParallelShards { get; set; } = null;
+
         /// <summary>
         /// The amount of time to wait until querying the DB again to look for Work Items.
         /// If a Work Item was found previously, this is ignored, and NQueue immediately
@@ -38,17 +31,20 @@ namespace NQueue
         /// Default = 30s
         /// </summary>
         public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(30);
+        
         /// <summary>
         /// Allows you to modify the HTTP request.  I've used this to add authentication in the past, but
         /// you can modify anything you like, even the RequestUri.
         /// </summary>
         public Func<HttpRequestMessage, ValueTask> ModifyHttpRequest { get; set; } = (_) => ValueTask.CompletedTask;
+        
         /// <summary>
         /// Used to create the DB Connection to the database to look for Work Items, or anything else like
         /// cron job management.
         /// Default = null (in-memory queues, usually for testing)
         /// </summary>
         public Func<ValueTask<DbConnection?>> CreateDbConnection { get; set; } = () => ValueTask.FromResult((DbConnection?) null);
+        
         /// <summary>
         /// A list of cron jobs which create Work Items on a schedule.
         /// These will not create duplicate Work Items

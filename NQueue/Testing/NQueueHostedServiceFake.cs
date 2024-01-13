@@ -84,8 +84,6 @@ namespace NQueue.Testing
             {
                 hasMore = false;
                 
-                var shardLock = new SharedDisposableRef<SemaphoreSlim>(new SemaphoreSlim(1, 1));
-
                 foreach (var shard in Enumerable.Range(0, conn.ShardCount))
                 {
                     var consumer = new WorkItemConsumer(1,
@@ -94,8 +92,7 @@ namespace NQueue.Testing
                         conn,
                         new MyHttpClientFactory(client),
                         _config,
-                        loggerFactory,
-                        shardLock.Share());
+                        loggerFactory);
 
                     var found = false;
 
@@ -122,7 +119,6 @@ namespace NQueue.Testing
             
             var conn = await _config.GetWorkItemDbConnection();
             
-            var shardLock = new SharedDisposableRef<SemaphoreSlim>(new SemaphoreSlim(1, 1));
             foreach (var shard in Enumerable.Range(0, conn.ShardCount))
             {
               
@@ -132,8 +128,7 @@ namespace NQueue.Testing
                     conn,
                     new MyHttpClientFactory(client),
                     _config,
-                    loggerFactory,
-                    shardLock.Share());
+                    loggerFactory);
 
 
                 if (await consumer.ExecuteOne(false, _externalBaseUrls, _externalUrlCalls))

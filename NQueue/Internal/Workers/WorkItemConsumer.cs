@@ -22,11 +22,9 @@ namespace NQueue.Internal.Workers
         private long _currentQueueRunners = 0;
         private readonly SpinWait _testingSpinWait = new();
         private readonly int _shard;
-        private readonly ISharedDisposableRefItem<SemaphoreSlim> _concurrentShardLock;
 
         public WorkItemConsumer(int maxQueueRunners, int shard, TimeSpan pollInterval, IWorkItemDbConnection workItemDbConnection,
-            IHttpClientFactory httpClientFactory, NQueueServiceConfig config, ILoggerFactory loggerFactory,
-            ISharedDisposableRefItem<SemaphoreSlim> concurrentShardLock) : base(
+            IHttpClientFactory httpClientFactory, NQueueServiceConfig config, ILoggerFactory loggerFactory) : base(
             pollInterval,
             typeof(WorkItemConsumer).FullName ?? "WorkItemConsumer",
             config.TimeZone,
@@ -39,7 +37,6 @@ namespace NQueue.Internal.Workers
             _config = config;
             _lock = new SemaphoreSlim(maxQueueRunners, maxQueueRunners);
             _maxQueueRunners = maxQueueRunners;
-            _concurrentShardLock = concurrentShardLock;
         }
 
 
@@ -60,15 +57,7 @@ namespace NQueue.Internal.Workers
             try
             {
                 await _lock.WaitAsync();
-                try
-                {
-                    await _concurrentShardLock.Item.WaitAsync();
-                    request = await query.NextWorkItem(_shard);
-                }
-                finally
-                {
-                    _concurrentShardLock.Item.Release();
-                }
+                request = await query.NextWorkItem(_shard);
             }
             finally
             {
@@ -78,17 +67,7 @@ namespace NQueue.Internal.Workers
             if (request == null)
             {
                 if (runPurge)
-                {
-                    try
-                    {
-                        await _concurrentShardLock.Item.WaitAsync();  
-                        await query.PurgeWorkItems(_shard);
-                    }
-                    finally
-                    {
-                        _concurrentShardLock.Item.Release();
-                    }
-                }
+                    await query.PurgeWorkItems(_shard);
 
                 logger.Log(LogLevel.Debug, "no work items found for shard {Shard}", _shard);
                 return false;
@@ -115,7 +94,6 @@ namespace NQueue.Internal.Workers
                     _lock.Wait(timeout);
             });
             _lock.Dispose();
-            _concurrentShardLock.Dispose();
         }
 
 
