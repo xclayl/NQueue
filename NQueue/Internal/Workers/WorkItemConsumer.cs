@@ -67,7 +67,16 @@ namespace NQueue.Internal.Workers
             if (request == null)
             {
                 if (runPurge)
-                    await query.PurgeWorkItems(_shard);
+                    try
+                    {
+                        await _lock.WaitAsync();
+                        await query.PurgeWorkItems(_shard);
+                    }
+                    finally
+                    {
+                        _lock.Release();
+                    }
+
 
                 logger.Log(LogLevel.Debug, "no work items found for shard {Shard}", _shard);
                 return false;
