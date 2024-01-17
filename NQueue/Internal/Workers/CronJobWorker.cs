@@ -63,35 +63,39 @@ namespace NQueue.Internal.Workers
 
         private async ValueTask ProcessCron(CronJobInfo? state, NQueueCronJob nQueueCronJob)
         {
-            await using var tran = await _workItemDbConnection.BeginTran();
-
-            if (state == null)
+            var poll = await _workItemDbConnection.AsTran(async tran =>
             {
-                await tran.CreateCronJob(nQueueCronJob.Name);
-                state = new CronJobInfo(nQueueCronJob.Name, new DateTimeOffset(0, TimeSpan.Zero));
-            }
+                
+                if (state == null)
+                {
+                    await tran.CreateCronJob(nQueueCronJob.Name);
+                    state = new CronJobInfo(nQueueCronJob.Name, new DateTimeOffset(0, TimeSpan.Zero));
+                }
 
-            var cron = await tran.SelectAndLockCronJob(state.CronJobName);
+                var cron = await tran.SelectAndLockCronJob(state.CronJobName);
 
-            if (cron.active)
-            {
-                var exp = CronExpression.Parse(nQueueCronJob.CronSpec);
+                if (cron.active)
+                {
+                    var exp = CronExpression.Parse(nQueueCronJob.CronSpec);
 
-                var nextOccurrence = exp.GetNextOccurrence(cron.lastRan, _tz);
-                if (nextOccurrence != null && nextOccurrence > DateTimeOffset.Now)
-                    return;
+                    var nextOccurrence = exp.GetNextOccurrence(cron.lastRan, _tz);
+                    if (nextOccurrence != null && nextOccurrence > DateTimeOffset.Now)
+                        return false;
 
-                var url = string.Format(nQueueCronJob.Url, nextOccurrence ?? Now(_tz));
+                    var url = string.Format(nQueueCronJob.Url, nextOccurrence ?? Now(_tz));
 
-                await tran.EnqueueWorkItem(new Uri(url), nQueueCronJob.QueueName,
-                    $"From CronJob {state.CronJobName}", true);
+                    await tran.EnqueueWorkItem(new Uri(url), nQueueCronJob.QueueName,
+                        $"From CronJob {state.CronJobName}", true);
 
-                await tran.UpdateCronJobLastRanAt(state.CronJobName);
-            }
-
-            await tran.CommitAsync();
+                    await tran.UpdateCronJobLastRanAt(state.CronJobName);
+                }
+                return true;
+            });
             
-            _state.PollNow();
+            if (poll)
+                _state.PollNow();
+
+            
         }
 
 

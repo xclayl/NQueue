@@ -4,32 +4,52 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Npgsql;
 using NQueue.Internal.Db;
+using NQueue.Internal.Model;
 
 namespace NQueue.Tests.DbTesting;
 
-public class PostgresDbConfig : IDbConfig
+internal class PostgresDbConfig : IDbConfig
 {
     public TimeZoneInfo TimeZone { get; init; }
     public string Cnn { get; init; }
     
-    public async ValueTask<DbConnection?> OpenDbConnection()
+    public async ValueTask WithDbConnection(Func<DbConnection, ValueTask> action)
     {
-        var cnn = new NpgsqlConnection(Cnn);
+        await using var cnn = new NpgsqlConnection(Cnn);
         await cnn.OpenAsync();
-        return cnn;
+        await action(cnn);
     }
+
+    public async ValueTask<T> WithDbConnection<T>(Func<DbConnection, ValueTask<T>> action)
+    {
+        await using var cnn = new NpgsqlConnection(Cnn);
+        await cnn.OpenAsync();
+        return await action(cnn);
+    }
+
+    
+  
 }
 
 
-public class SqlServerDbConfig : IDbConfig
+internal class SqlServerDbConfig : IDbConfig
 {
     public TimeZoneInfo TimeZone { get; init; }
     public string Cnn { get; init; }
     
-    public async ValueTask<DbConnection?> OpenDbConnection()
+    public async ValueTask WithDbConnection(Func<DbConnection, ValueTask> action)
     {
-        var cnn = new SqlConnection(Cnn);
+        await using var cnn = new SqlConnection(Cnn);
         await cnn.OpenAsync();
-        return cnn;
+        await action(cnn);
     }
+
+    public async ValueTask<T> WithDbConnection<T>(Func<DbConnection, ValueTask<T>> action)
+    {
+        await using var cnn = new SqlConnection(Cnn);
+        await cnn.OpenAsync();
+        return await action(cnn);
+    }
+    
+    
 }

@@ -9,7 +9,8 @@ namespace NQueue.Internal.Db
     internal interface IWorkItemDbConnection
     {
         ValueTask<IWorkItemDbProcs> Get();
-        ValueTask<ICronTransaction> BeginTran();
+        ValueTask AsTran(Func<ICronTransaction, ValueTask> action);
+        ValueTask<T> AsTran<T>(Func<ICronTransaction, ValueTask<T>> action);
         ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck();
         ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState();
         int ShardCount { get; }

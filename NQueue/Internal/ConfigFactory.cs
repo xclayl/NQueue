@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Cronos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using NQueue.Internal.Model;
 
 namespace NQueue.Internal
 {
@@ -17,9 +18,10 @@ namespace NQueue.Internal
     {
         private readonly Func<IServiceProvider, NQueueServiceConfig, ValueTask>? _configBuilder;
         private NQueueServiceConfig? _config;
-        private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
+        private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly IServiceProvider? _serviceProvider;
-        private volatile bool _ready = false; 
+        private volatile bool _appStarted = false;
+        private volatile IDbConnectionLock? _dbLock;
 
         public ConfigFactory(Func<IServiceProvider, NQueueServiceConfig, ValueTask> configBuilder,
             IServiceProvider serviceProvider)
@@ -27,28 +29,28 @@ namespace NQueue.Internal
             _configBuilder = configBuilder;
             _serviceProvider = serviceProvider;
             _serviceProvider.GetRequiredService<IHostApplicationLifetime>().ApplicationStarted
-                .Register(() => _ready = true);
+                .Register(() => _appStarted = true);
         }
 
         public ConfigFactory(NQueueServiceConfig config)
         {
             _config = config;
-            _ready = true;
+            _appStarted = true;
         }
 
         public async ValueTask<NQueueServiceConfig> GetConfig()
         {
-            while (!_ready)
+            while (!_appStarted || _dbLock == null)
             {
                 await Task.Delay(1_000);
             }
             
-            await _lock.WaitAsync();
+            await _initLock.WaitAsync();
             try
             {
                 if (_config == null)
                 {
-                    _config = new NQueueServiceConfig();
+                    _config = new NQueueServiceConfig(_dbLock);
                     await _configBuilder!(_serviceProvider!, _config);
 
                     AssertNoDuplicateCronJobNames(_config.CronJobs);
@@ -60,7 +62,7 @@ namespace NQueue.Internal
             }
             finally
             {
-                _lock.Release();
+                _initLock.Release();
             }
         }
 
@@ -111,7 +113,12 @@ namespace NQueue.Internal
 
         public void Dispose()
         {
-            _lock?.Dispose();
+            _initLock?.Dispose();
+        }
+
+        public void SetDbLock(IDbConnectionLock cnnLock)
+        {
+            _dbLock = cnnLock;
         }
     }
 }

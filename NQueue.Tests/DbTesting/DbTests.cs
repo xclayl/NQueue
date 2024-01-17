@@ -93,14 +93,15 @@ public class DbTests : IAsyncLifetime
         health.healthy.Should().BeTrue();
         health.countUnhealthy.Should().Be(0);
 
-        await using var tran = await dbCnn.BeginTran();
-        var cronJobName = "cron name";
-        await tran.CreateCronJob(cronJobName);
-        var cron = await tran.SelectAndLockCronJob(cronJobName);
-        cron.active.Should().BeTrue();
-        await tran.UpdateCronJobLastRanAt(cronJobName);
+        await dbCnn.AsTran(async tran =>
+        {
+            var cronJobName = "cron name";
+            await tran.CreateCronJob(cronJobName);
+            var cron = await tran.SelectAndLockCronJob(cronJobName);
+            cron.active.Should().BeTrue();
+            await tran.UpdateCronJobLastRanAt(cronJobName);
+        });
         
-        await tran.CommitAsync();
         
         
 

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -35,11 +34,17 @@ namespace NQueue.Internal
         {
             _logger.LogInformation("starting work request background services");
 
+            
+            using var cnnLock = new DbConnectionLock();
+
+            _configFactory.SetDbLock(cnnLock);
+            
             while (!stoppingToken.IsCancellationRequested)
                 try
                 {
                     var config = await _configFactory.GetConfig();
 
+                    
                     var conn = await config.GetWorkItemDbConnection();
 
                     while (!stoppingToken.IsCancellationRequested)

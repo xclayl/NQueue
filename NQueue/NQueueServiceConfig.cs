@@ -5,17 +5,19 @@ using System.Data.Common;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using NQueue.Internal;
 using NQueue.Internal.Db;
 using NQueue.Internal.Db.InMemory;
 using NQueue.Internal.Db.Postgres;
 using NQueue.Internal.Db.SqlServer;
+using NQueue.Internal.Model;
 
 namespace NQueue
 {
 
     public class NQueueServiceConfig : IDbConfig
     {
+        private readonly IDbConnectionLock _dbLock;
+        
         /// <summary>
         /// Maximum number of Work Items to be processed in parallel (per Shard).  0 = disables queue processing.
         /// Feel free to use a ridiculous number, like 1_000_000.
@@ -69,30 +71,65 @@ namespace NQueue
         private volatile IWorkItemDbConnection? _workItemDbConnection;
         private readonly InMemoryWorkItemDbConnection _inMemoryWorkItemDbConnection = new();
 
-
-
-        private async ValueTask<DbConnection?> OpenDbConnectionForDetection()
+        internal NQueueServiceConfig(IDbConnectionLock dbLock)
         {
-            if (CreateDbConnection == null)
-                throw new Exception("This should never happen, CreateDbConnection is null.");
-            var conn = await CreateDbConnection();
-            if (conn == null)
-                return null;
-            if (conn!.State != ConnectionState.Open)
-                await conn.OpenAsync();
-            return conn;
+            _dbLock = dbLock;
         }
 
-        public async ValueTask<DbConnection> OpenDbConnection()
+
+        /// <summary>
+        /// Whether NQueue should have a single connection to the DB at a time.
+        /// When false (defoult), NQueue will open DB Connections as need, unrestricted.
+        /// When true, NQueue will only open DB Connections if no other DB Connection is open.
+        /// This can be useful if the DB has a small number of limited connections allowed,
+        /// especially through a shored connection pooling, like PG Bouncer.
+        /// </summary>
+        public bool SingleDbConnectionAtATime { get; set; }
+
+        private async ValueTask<T> WithDbConnectionForDetection<T>(Func<DbConnection?, ValueTask<T>> action)
         {
             if (CreateDbConnection == null)
                 throw new Exception("This should never happen, CreateDbConnection is null.");
+            
+            using var connectionLock = SingleDbConnectionAtATime ? await _dbLock.Acquire() : null;
+            
             var conn = await CreateDbConnection();
+            if (conn == null)
+                return await action(null);
+            if (conn!.State != ConnectionState.Open)
+                await conn.OpenAsync();
+            
+            return await action(conn);
+        }
+
+
+        async ValueTask IDbConfig.WithDbConnection(Func<DbConnection, ValueTask> action)
+        {
+            await WithDbConnectionPriv(async conn =>
+            {
+                await action(conn);
+                return 0;
+            });
+        }
+        async ValueTask<T> IDbConfig.WithDbConnection<T>(Func<DbConnection, ValueTask<T>> action)
+        {
+            return await WithDbConnectionPriv(async conn => await action(conn));
+        }
+
+        private async ValueTask<T> WithDbConnectionPriv<T>(Func<DbConnection, ValueTask<T>> action)
+        {
+            if (CreateDbConnection == null)
+                throw new Exception("This should never happen, CreateDbConnection is null.");
+
+            using var connectionLock = SingleDbConnectionAtATime ? await _dbLock.Acquire() : null;
+
+            await using var conn = await CreateDbConnection();
             if (conn == null)
                 throw new Exception("This should never happen, CreateDbConnection returned a null.");
             if (conn!.State != ConnectionState.Open)
                 await conn.OpenAsync();
-            return conn;
+            
+            return await action(conn);
         }
 
         /// <summary>
@@ -121,62 +158,68 @@ namespace NQueue
 
         private async ValueTask<DbServerTypes> DetectServerType()
         {
-            await using var conn = await OpenDbConnectionForDetection();
-            if (conn == null)
-                return DbServerTypes.InMemory;
-            // Console.WriteLine(conn.ServerVersion);
-            // 16.00.5100 for SQL Server
-            // 16.0 for Postgres
-
-            var points = new Dictionary<DbServerTypes, double>()
+            return await WithDbConnectionForDetection(async conn =>
             {
-                { DbServerTypes.SqlServer, 0 },
-                { DbServerTypes.Postgres, 0 },
-            };
+                if (conn == null)
+                    return DbServerTypes.InMemory;
+                // Console.WriteLine(conn.ServerVersion);
+                // 16.00.5100 for SQL Server
+                // 16.0 for Postgres
 
-            if (conn.ServerVersion.Count(c => c == '.') == 2)
-                points[DbServerTypes.SqlServer] += 0.1;
-            if (conn.ServerVersion.Count(c => c == '.') == 1)
-                points[DbServerTypes.Postgres] += 0.1;
-
-            var schemas = await 
-                AbstractWorkItemDb.ExecuteReader("select distinct schema_name from INFORMATION_SCHEMA.SCHEMATA", conn, reader => reader.GetString(0))
-                    .ToListAsync();
-            
-            if (schemas.Contains("dbo"))
-                points[DbServerTypes.SqlServer] += 0.9;
-            if (schemas.Contains("sys"))
-                points[DbServerTypes.SqlServer] += 0.5;
-            if (schemas.Contains("public"))
-                points[DbServerTypes.Postgres] += 0.3;
-            if (schemas.Contains("pg_catalog"))
-                points[DbServerTypes.Postgres] += 1;
-
-            var order = points.OrderByDescending(kv => kv.Value).Select(kv => kv.Key).ToList();
-
-            foreach (var dbServerType in order)
-            {
-                switch (dbServerType)
+                var points = new Dictionary<DbServerTypes, double>()
                 {
-                    case DbServerTypes.Postgres:
-                        if (await IsPostgres(conn))
-                        {
-                            if (await IsPostgresCitus(conn))
-                                return DbServerTypes.PostgresCitus;
-                            else
-                                return DbServerTypes.Postgres;
-                        }
-                        break;
-                    case DbServerTypes.SqlServer:
-                        if (await IsSqlServer(conn))
-                            return DbServerTypes.SqlServer;
-                        break;
-                    default:
-                        throw new Exception($"Unknown type: {dbServerType}");
-                }
-            }
+                    { DbServerTypes.SqlServer, 0 },
+                    { DbServerTypes.Postgres, 0 },
+                };
 
-            throw new Exception("DB Type not detected");
+                if (conn.ServerVersion.Count(c => c == '.') == 2)
+                    points[DbServerTypes.SqlServer] += 0.1;
+                if (conn.ServerVersion.Count(c => c == '.') == 1)
+                    points[DbServerTypes.Postgres] += 0.1;
+
+                var schemas = await
+                    AbstractWorkItemDb.ExecuteReader("select distinct schema_name from INFORMATION_SCHEMA.SCHEMATA",
+                            conn, reader => reader.GetString(0))
+                        .ToListAsync();
+
+                if (schemas.Contains("dbo"))
+                    points[DbServerTypes.SqlServer] += 0.9;
+                if (schemas.Contains("sys"))
+                    points[DbServerTypes.SqlServer] += 0.5;
+                if (schemas.Contains("public"))
+                    points[DbServerTypes.Postgres] += 0.3;
+                if (schemas.Contains("pg_catalog"))
+                    points[DbServerTypes.Postgres] += 1;
+
+                var order = points.OrderByDescending(kv => kv.Value).Select(kv => kv.Key).ToList();
+
+                foreach (var dbServerType in order)
+                {
+                    switch (dbServerType)
+                    {
+                        case DbServerTypes.Postgres:
+                            if (await IsPostgres(conn))
+                            {
+                                if (await IsPostgresCitus(conn))
+                                    return DbServerTypes.PostgresCitus;
+                                else
+                                    return DbServerTypes.Postgres;
+                            }
+
+                            break;
+                        case DbServerTypes.SqlServer:
+                            if (await IsSqlServer(conn))
+                                return DbServerTypes.SqlServer;
+                            break;
+                        default:
+                            throw new Exception($"Unknown type: {dbServerType}");
+                    }
+                }
+
+                throw new Exception("DB Type not detected");
+
+
+            });
             
                 
         }

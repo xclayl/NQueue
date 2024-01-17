@@ -3,13 +3,11 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Net.Http;
-using System.Runtime.CompilerServices;
-using System.Security.AccessControl;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NQueue.Internal;
 using NQueue.Internal.Db.InMemory;
+using NQueue.Internal.Model;
 using NQueue.Internal.Workers;
 
 namespace NQueue.Testing
@@ -31,16 +29,39 @@ namespace NQueue.Testing
         
         public NQueueHostedServiceFake(Func<ValueTask<DbConnection?>> cnnBuilder, Uri? baseUri = null)
         {
-            _config = new NQueueServiceConfig
+            var fakeDbLock = new FakeDbConnectionLock();
+            _config = new NQueueServiceConfig(fakeDbLock)
             {
                 CreateDbConnection = cnnBuilder
             };
             if (baseUri != null)
                 _config.LocalHttpAddresses = new[] { baseUri.AbsoluteUri };
             var configFactory = new ConfigFactory(_config);
+            configFactory.SetDbLock(fakeDbLock);
 
             _service = new NQueueServiceFake(configFactory);
 
+        }
+
+        private class FakeDbConnectionLock : IDbConnectionLock
+        {
+            public void Dispose()
+            {
+                // TODO release managed resources here
+            }
+
+            public ValueTask<IDisposable> Acquire()
+            {
+                return ValueTask.FromResult<IDisposable>(new FakeDisposable());
+            }
+
+            private class FakeDisposable : IDisposable
+            {
+                public void Dispose()
+                {
+                    // TODO release managed resources here
+                }
+            }
         }
 
         public INQueueClient Client => _service;

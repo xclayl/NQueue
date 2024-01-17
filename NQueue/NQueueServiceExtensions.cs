@@ -63,7 +63,7 @@ namespace NQueue
             NQueueHostedServiceFake testServiceFake)
         {
             services.RemoveAll<InternalConfig>();
-            services.AddSingleton(InternalConfig.AsDisabled);
+            services.AddSingleton(InternalConfig.AsDisabledAndUnitTest);
 
             services.AddSingleton<INQueueService>(testServiceFake.Service);
             services.AddSingleton<INQueueClient>(testServiceFake.Client);

@@ -19,10 +19,21 @@ namespace NQueue.Internal.Db.InMemory
             throw new Exception("The in-memory NQueue implementation is not compatible with DB transactions.");
         }
         
-        
-        public async ValueTask<ICronTransaction> BeginTran()
+        public async ValueTask AsTran(Func<ICronTransaction, ValueTask> action)
         {
-            return await _procs.BeginTran();
+            await AsTran(async conn =>
+            {
+                await action(conn);
+                return 0;
+            });
+        }
+        
+        public async ValueTask<T> AsTran<T>(Func<ICronTransaction, ValueTask<T>> action)
+        {
+            var tran = await _procs.BeginTran();
+            var val = await action(tran);
+            await tran.CommitAsync();
+            return val;
         }
         
         

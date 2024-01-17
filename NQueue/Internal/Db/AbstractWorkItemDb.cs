@@ -10,7 +10,7 @@ namespace NQueue.Internal.Db
 
     internal abstract class AbstractWorkItemDb
     {
-        protected readonly TimeZoneInfo _tz;
+        private readonly TimeZoneInfo _tz;
 
         protected AbstractWorkItemDb(TimeZoneInfo tz)
         {

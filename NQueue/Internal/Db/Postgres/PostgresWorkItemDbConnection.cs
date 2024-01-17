@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,12 +26,31 @@ namespace NQueue.Internal.Db.Postgres
             return new PostgresWorkItemDbProcs(_config, IsCitus);
         }
 
-        public async ValueTask<ICronTransaction> BeginTran()
+
+        public async ValueTask AsTran(Func<ICronTransaction, ValueTask> action)
+        {
+            await AsTran(async conn =>
+            {
+                await action(conn);
+                return 0;
+            });
+        }
+
+        public async ValueTask<T> AsTran<T>(Func<ICronTransaction, ValueTask<T>> action)
         {
             await EnsureDbMigrationRuns();
-            var conn = await _config.OpenDbConnection();
-            return new PostgresCronTransaction(await conn.BeginTransactionAsync(), conn, _config.TimeZone, IsCitus);
+
+            return await _config.WithDbConnection(async conn =>
+            {
+                await using var dbTran = await conn.BeginTransactionAsync();
+                var tran = new PostgresCronTransaction(dbTran, conn, _config.TimeZone, IsCitus);
+                var val = await action(tran);
+                await tran.CommitAsync();
+                return val;
+            });
+          
         }
+       
 
         private async ValueTask EnsureDbMigrationRuns()
         {
@@ -43,8 +61,8 @@ namespace NQueue.Internal.Db.Postgres
                 {
                     if (!_dbMigrationRan)
                     {
-                        await using var conn = await _config.OpenDbConnection();
-                        await PostgresDbMigrator.UpdateDbSchema(conn, IsCitus);
+                        await _config.WithDbConnection(async conn =>
+                            await PostgresDbMigrator.UpdateDbSchema(conn, IsCitus));
     
                         _dbMigrationRan = true;
                     }
@@ -60,16 +78,19 @@ namespace NQueue.Internal.Db.Postgres
         public async ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState()
         {
             await EnsureDbMigrationRuns();
-            await using var cnn = await _config.OpenDbConnection();
-            var rows = ExecuteReader(
-                "SELECT CronJobName, LastRanAt FROM NQueue.CronJob", 
-                cnn,
-                reader => new CronJobInfo(
-                    reader.GetString(0),
-                    new DateTimeOffset(reader.GetDateTime(1), TimeSpan.Zero)
-                ));
+            return await _config.WithDbConnection(async cnn =>
+            {
+                var rows = ExecuteReader(
+                    "SELECT CronJobName, LastRanAt FROM NQueue.CronJob",
+                    cnn,
+                    reader => new CronJobInfo(
+                        reader.GetString(0),
+                        new DateTimeOffset(reader.GetDateTime(1), TimeSpan.Zero)
+                    ));
 
-            return await rows.ToListAsync();
+                return await rows.ToListAsync();
+            });
+
         }
 
         public int ShardCount => IsCitus ? 16 : 1;
@@ -78,15 +99,18 @@ namespace NQueue.Internal.Db.Postgres
         public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()
         {
             await EnsureDbMigrationRuns();
-            await using var cnn = await _config.OpenDbConnection();
-            var rows = ExecuteReader(
-                "SELECT COUNT(*) FROM NQueue.Queue WHERE ErrorCount >= 5",
-                cnn,
-                reader => reader.GetInt32(0));
+            return await _config.WithDbConnection(async cnn =>
+            {
+                var rows = ExecuteReader(
+                    "SELECT COUNT(*) FROM NQueue.Queue WHERE ErrorCount >= 5",
+                    cnn,
+                    reader => reader.GetInt32(0));
 
-            var count = await rows.SingleAsync();
+                var count = await rows.SingleAsync();
 
-            return (count == 0, count);
+                return (count == 0, count);
+            });
+
         }
 
     }

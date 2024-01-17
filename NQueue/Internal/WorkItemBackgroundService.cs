@@ -41,17 +41,17 @@ namespace NQueue.Internal
             }
             else
             {
-                await RunUntilStopped(stoppingToken);
+                await RunUntilStopped(stoppingToken, conf.IsUnitTest);
             }
         }
 
-        private async ValueTask RunUntilStopped(CancellationToken stoppingToken)
+        private async ValueTask RunUntilStopped(CancellationToken stoppingToken, bool isUnitTest)
         {
             while (true)
             {
                 try
                 {
-                    await Task.Delay(5000, stoppingToken);
+                    await Task.Delay(isUnitTest ? 10 : 5000, stoppingToken);
                 }
                 catch
                 {
