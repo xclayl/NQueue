@@ -92,8 +92,8 @@ namespace NQueue
                 throw new Exception("This should never happen, CreateDbConnection is null.");
             
             using var connectionLock = SingleDbConnectionAtATime ? await _dbLock.Acquire() : null;
-            
-            var conn = await CreateDbConnection();
+
+            await using var conn = await CreateDbConnection();
             if (conn == null)
                 return await action(null);
             if (conn!.State != ConnectionState.Open)
