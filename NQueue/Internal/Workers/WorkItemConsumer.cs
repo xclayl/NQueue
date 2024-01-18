@@ -132,7 +132,7 @@ namespace NQueue.Internal.Workers
                     if (resp.IsSuccessStatusCode)
                     {
                         await query.CompleteWorkItem(request.WorkItemId, _shard);
-                        logger.Log(LogLevel.Information, "work item completed {Shard}", _shard);
+                        logger.LogDebug("work item completed {Shard}", _shard);
                     }
                     else
                     {

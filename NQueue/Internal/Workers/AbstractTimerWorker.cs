@@ -69,7 +69,8 @@ namespace NQueue.Internal.Workers
                         using var wakeUpTokenSource = _wakeUp.CreateTokenSource();
                         using var combo = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, wakeUpTokenSource.Token);
                         
-                        logger.Log(LogLevel.Information, $"Pausing for work {sleepTime}");
+                        
+                        logger.LogDebug("Pausing for work {SleepTime}", sleepTime);
                         await Task.Delay(sleepTime, combo.Token);
                     }
                 }
