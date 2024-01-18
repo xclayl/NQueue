@@ -2,13 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace NQueue.Internal.Db;
+namespace NQueue.Internal.Db.SqlServer.DbMigrations;
 
-internal record class DbSchemaInfo(string Type, string Name)
+public record SqlServerSchemaInfo(string Type, string Name)
 {
-
-
-    public static bool IsVersion01(IReadOnlyList<DbSchemaInfo> actual)
+    
+    public static bool IsVersion01(IReadOnlyList<SqlServerSchemaInfo> actual)
     {
    
         var expectedTables = new[]
@@ -40,7 +39,7 @@ internal record class DbSchemaInfo(string Type, string Name)
     }
 
 
-    private static IReadOnlyList<DbSchemaInfo> Version02 => new DbSchemaInfo[]
+    private static IReadOnlyList<SqlServerSchemaInfo> Version02 => new SqlServerSchemaInfo[]
     {
         new("column", "CronJob.Active"),
         new("column", "CronJob.CronJobId"),
@@ -81,7 +80,7 @@ internal record class DbSchemaInfo(string Type, string Name)
     };
 
 
-    private static bool IsVersion(IReadOnlyList<DbSchemaInfo> actual, IReadOnlyList<DbSchemaInfo> expected)
+    private static bool IsVersion(IReadOnlyList<SqlServerSchemaInfo> actual, IReadOnlyList<SqlServerSchemaInfo> expected)
     {
         if (expected.Count != actual.Count)
             return false;
@@ -98,16 +97,16 @@ internal record class DbSchemaInfo(string Type, string Name)
                               && i.Expected.Name.Equals(i.Actual.Name, StringComparison.InvariantCultureIgnoreCase) );
     }
 
-    public static bool IsVersion02(IReadOnlyList<DbSchemaInfo> actual)
+    public static bool IsVersion02(IReadOnlyList<SqlServerSchemaInfo> actual)
     {
-        var expected = DbSchemaInfo.Version02;
+        var expected = Version02;
 
         return IsVersion(actual, expected);
     }
 
     
     
-    private static IReadOnlyList<DbSchemaInfo> Version03 => new DbSchemaInfo[]
+    private static IReadOnlyList<SqlServerSchemaInfo> Version03 => new SqlServerSchemaInfo[]
     {
         new("column", "CronJob.Active"),
         new("column", "CronJob.CronJobName"),
@@ -148,10 +147,11 @@ internal record class DbSchemaInfo(string Type, string Name)
         new("table", "WorkItem"),
         new("table", "WorkItemCompleted"),
     };
-    public static bool IsVersion03(IReadOnlyList<DbSchemaInfo> actual)
+    public static bool IsVersion03(IReadOnlyList<SqlServerSchemaInfo> actual)
     {
-        var expected = DbSchemaInfo.Version03;
+        var expected = Version03;
 
+        
         return IsVersion(actual, expected);
     }
-};
+}

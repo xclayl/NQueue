@@ -20,21 +20,23 @@ end; $$");
             
             var currentVersion = 0;
 
-            while (currentVersion != 3)
+            while (currentVersion != 4)
             {
                 
                 var dbObjects = await AbstractWorkItemDb.ExecuteReader(
                     tran,
                     @"                   
-                    select 'schema' AS type, s.SCHEMA_NAME AS name from INFORMATION_SCHEMA.SCHEMATA s where s.SCHEMA_NAME = 'nqueue'
+                    select 'schema' AS type, s.SCHEMA_NAME::text AS name from INFORMATION_SCHEMA.SCHEMATA s where s.SCHEMA_NAME = 'nqueue'
                     UNION
                     select 'table' AS type, t.TABLE_NAME FROM INFORMATION_SCHEMA.TABLES t WHERE t.TABLE_SCHEMA = 'nqueue'
                     UNION
                     select 'routine' AS type, r.ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'nqueue'
                     UNION
-                    select 'column' AS type,  c.table_name::text || '.' || c.column_name::text AS column_name FROM INFORMATION_SCHEMA.COLUMNS c WHERE c.TABLE_SCHEMA = 'nqueue';
+                    select 'column' AS type,  c.table_name::text || '.' || c.column_name::text AS column_name FROM INFORMATION_SCHEMA.COLUMNS c WHERE c.TABLE_SCHEMA = 'nqueue'
+                    UNION
+                    select 'index' AS type, i.tablename::text || '.' || i.indexname::text || ': ' || i.indexdef FROM pg_indexes i WHERE i.schemaname = 'nqueue';
                     ", 
-                        reader => new DbSchemaInfo(
+                        reader => new PostgresSchemaInfo(
                         reader.GetString(0),
                         reader.GetString(1)
                     )
@@ -47,15 +49,19 @@ end; $$");
 
                     currentVersion = 0;
                 }
-                else if (DbSchemaInfo.IsVersion03(dbObjects))
+                else if (PostgresSchemaInfo.IsVersion04(dbObjects))
+                {
+                    currentVersion = 4;
+                }
+                else if (PostgresSchemaInfo.IsVersion03(dbObjects))
                 {
                     currentVersion = 3;
                 }
-                else if (DbSchemaInfo.IsVersion02(dbObjects))
+                else if (PostgresSchemaInfo.IsVersion02(dbObjects))
                 {
                     currentVersion = 2;
                 }
-                else if (DbSchemaInfo.IsVersion01(dbObjects))
+                else if (PostgresSchemaInfo.IsVersion01(dbObjects))
                 {
                     currentVersion = 1;
                 }
@@ -76,6 +82,10 @@ end; $$");
                 if (currentVersion == 2)
                 {
                     await new PostgresDbUpgrader03().Upgrade(tran, isCitus);
+                }
+                if (currentVersion == 3)
+                {
+                    await new PostgresDbUpgrader04().Upgrade(tran, isCitus);
                 }
             }
 

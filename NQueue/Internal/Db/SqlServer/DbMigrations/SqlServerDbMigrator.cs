@@ -38,11 +38,24 @@ END
                     select 'routine' AS [type], r.ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'NQueue'
                     UNION
                     select 'column' AS type, c.TABLE_NAME + '.' + c.COLUMN_NAME AS column_name FROM INFORMATION_SCHEMA.COLUMNS c WHERE c.TABLE_SCHEMA = 'nqueue';
-                    ", reader => new DbSchemaInfo(
+                    ", reader => new SqlServerSchemaInfo(
                         reader.GetString(0),
                         reader.GetString(1)
                     )
                 ).ToListAsync();
+                /*
+select 'index' as type, a.table_name + '.' + a.index_name + ': (' + STRING_AGG(a.col_name, ',')  WITHIN GROUP ( ORDER BY a.key_ordinal) + ')' as val
+FROM (
+	select o.name as table_name, i.name as index_name, c.name as col_name, ic.key_ordinal		
+	from sys.indexes i
+	inner join sys.index_columns ic on i.object_id = ic.object_id and i.index_id = ic.index_id
+	inner join sys.columns c on ic.column_id = c.column_id and ic.object_id = c.object_id
+	inner join sys.objects o on i.object_id = o.object_id
+	inner join sys.schemas s on o.schema_id = s.schema_id
+	where s.name = 'nqueue'
+)  a
+group by a.table_name, a.index_name
+                 */
 
 
                 if (dbObjects.Count == 0 || dbObjects.Count == 1 && dbObjects.Single().Type == "schema" && dbObjects.Single().Name == "NQueue")
@@ -51,15 +64,15 @@ END
 
                     currentVersion = 0;
                 }
-                else if (DbSchemaInfo.IsVersion03(dbObjects))
+                else if (SqlServerSchemaInfo.IsVersion03(dbObjects))
                 {
                     currentVersion = 3;
                 }
-                else if (DbSchemaInfo.IsVersion02(dbObjects))
+                else if (SqlServerSchemaInfo.IsVersion02(dbObjects))
                 {
                     currentVersion = 2;
                 }
-                else if (DbSchemaInfo.IsVersion01(dbObjects))
+                else if (SqlServerSchemaInfo.IsVersion01(dbObjects))
                 {
                     currentVersion = 1;
                 }
