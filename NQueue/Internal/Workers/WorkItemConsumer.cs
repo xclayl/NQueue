@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -133,6 +134,11 @@ namespace NQueue.Internal.Workers
                     {
                         await query.CompleteWorkItem(request.WorkItemId, _shard);
                         logger.LogDebug("work item completed {Shard}", _shard);
+                    }
+                    else if (resp.StatusCode == HttpStatusCode.TooManyRequests)
+                    {
+                        await query.DelayWorkItem(request.WorkItemId, _shard);
+                        logger.Log(LogLevel.Information, "work item, {HttpReqMethod} {HttpReqRequestUri}, returned status code {RespStatusCode}, rescheduling for later. {Shard}", httpReq.Method, httpReq.RequestUri, resp.StatusCode, _shard);
                     }
                     else
                     {

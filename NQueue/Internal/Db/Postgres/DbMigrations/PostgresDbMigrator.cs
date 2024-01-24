@@ -20,7 +20,7 @@ end; $$");
             
             var currentVersion = 0;
 
-            while (currentVersion != 4)
+            while (currentVersion != 5)
             {
                 
                 var dbObjects = await AbstractWorkItemDb.ExecuteReader(
@@ -48,6 +48,10 @@ end; $$");
                     // version "0" DB. Upgrade to version 1
 
                     currentVersion = 0;
+                }
+                else if (PostgresSchemaInfo.IsVersion05(dbObjects))
+                {
+                    currentVersion = 5;
                 }
                 else if (PostgresSchemaInfo.IsVersion04(dbObjects))
                 {
@@ -86,6 +90,10 @@ end; $$");
                 if (currentVersion == 3)
                 {
                     await new PostgresDbUpgrader04().Upgrade(tran, isCitus);
+                }
+                if (currentVersion == 4)
+                {
+                    await new PostgresDbUpgrader05().Upgrade(tran, isCitus);
                 }
             }
 

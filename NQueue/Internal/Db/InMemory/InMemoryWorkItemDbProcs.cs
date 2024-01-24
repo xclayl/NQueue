@@ -19,6 +19,7 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
     public ValueTask<WorkItemInfo?> NextWorkItem(int shard) => Db.NextWorkItem();
 
     public ValueTask CompleteWorkItem(int workItemId, int shard) => Db.CompleteWorkItem(workItemId);
+    public ValueTask DelayWorkItem(int workItemId, int shard) => Db.DelayWorkItem(workItemId);
 
     public ValueTask FailWorkItem(int workItemId, int shard) => Db.FailWorkItem(workItemId);
 

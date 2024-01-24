@@ -57,6 +57,20 @@ namespace NQueue.Internal.Db.Postgres
             });
         }
 
+        public async ValueTask DelayWorkItem(int workItemId, int shard)
+        {
+            await _config.WithDbConnection(async cnn =>
+            {
+                await ExecuteProcedure(
+                    "nqueue.DelayWorkItem",
+                    cnn,
+                    SqlParameter(workItemId),
+                    SqlParameter(shard),
+                    SqlParameter(NowUtc)
+                );
+            });
+        }
+
         public async ValueTask FailWorkItem(int workItemId, int shard)
         {
             await _config.WithDbConnection(async cnn =>

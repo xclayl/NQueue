@@ -4,6 +4,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 
@@ -42,6 +43,12 @@ namespace NQueue.Sample.Controllers
         public string GetMessage()
         {
             return _msg;
+        }
+        
+        [HttpGet]
+        public IActionResult TooManyRequests()
+        {
+            return new StatusCodeResult(429);
         }
 
         public async Task<IActionResult> ErrorOp()

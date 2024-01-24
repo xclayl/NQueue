@@ -128,6 +128,22 @@ public class DbTests : IAsyncLifetime
             @"{""a"": 3}");
         
         
+        
+
+        foreach (var shard in Enumerable.Range(0, dbCnn.ShardCount))
+        {
+            var queuedItem = await procs.NextWorkItem(shard);
+            if (queuedItem == null)
+                continue;
+
+            queuedItem.Url.Should().Be("http://localhost/api/NQueue/NoOp");
+            queuedItem.Internal.Should().Be(@"{""a"": 3}");
+            
+            await procs.DelayWorkItem(queuedItem.WorkItemId, shard);
+            break;
+        }
+
+        
 
         foreach (var shard in Enumerable.Range(0, dbCnn.ShardCount))
         {
@@ -169,4 +185,83 @@ public class DbTests : IAsyncLifetime
     }
 
     
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task TooManyRequests(DbType dbType)
+    {
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        var fakeApp = new FakeWebApp();
+        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        await fakeService.DeleteAllNQueueData();
+        fakeApp.FakeService = fakeService;
+
+        await using var app = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl)); 
+        var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+        var guid = Guid.NewGuid();
+        
+        // act
+        await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/TooManyRequests"));
+        await fakeApp.FakeService.ProcessOne(app.CreateClient,
+            app.Services.GetRequiredService<ILoggerFactory>());
+
+        // assert
+        await using var cnn = await _dbCreators[dbType].CreateConnection();
+        if (cnn == null)
+        {
+            var workItems = await (await fakeService.GetInMemoryDb())!.GetWorkItems();
+            workItems.Should().HaveCount(1);
+            workItems.Single().FailCount.Should().Be(0);
+            
+            var completedWorkItems = await (await fakeService.GetInMemoryDb())!.GetCompletedWorkItems();
+            completedWorkItems.Should().BeEmpty();
+        }
+        else
+        {
+            await cnn.OpenAsync();
+            {
+                await using var cmd = cnn.CreateCommand();
+                cmd.CommandText = "SELECT * FROM NQueue.WorkItem";
+                await using var reader = await cmd.ExecuteReaderAsync();
+                var workItems = new List<int>();
+                while (await reader.ReadAsync())
+                {
+                    workItems.Add(1);
+                }
+
+                workItems.Should().HaveCount(1);
+            }
+            {
+                await using var cmdComp = cnn.CreateCommand();
+                cmdComp.CommandText = "SELECT * FROM NQueue.WorkItemCompleted";
+                await using var readerComp = await cmdComp.ExecuteReaderAsync();
+                var completedWorkItem = new List<int>();
+                while (await readerComp.ReadAsync())
+                {
+                    completedWorkItem.Add(readerComp.GetInt32(0));
+                }
+
+                completedWorkItem.Should().BeEmpty();
+            }
+
+            {
+                await using var cmdQueue = cnn.CreateCommand();
+                cmdQueue.CommandText = "SELECT ErrorCount FROM NQueue.Queue";
+                await using var readerQueue = await cmdQueue.ExecuteReaderAsync();
+                var queues = new List<int>();
+                while (await readerQueue.ReadAsync())
+                {
+                    queues.Add(readerQueue.GetInt32(0));
+                }
+
+                queues.Should().HaveCount(1);
+                queues.Single().Should().Be(0);
+            }
+        }
+        fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+    }
+
+
 }

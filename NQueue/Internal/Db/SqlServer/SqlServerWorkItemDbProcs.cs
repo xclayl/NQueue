@@ -58,6 +58,20 @@ namespace NQueue.Internal.Db.SqlServer
             });
         }
 
+        public async ValueTask DelayWorkItem(int workItemId, int shard)
+        {
+            await _config.WithDbConnection(async cnn =>
+            {
+                await ExecuteNonQuery(
+                    "EXEC [NQueue].[DelayWorkItem] @WorkItemID=@WorkItemID, @Shard=@Shard, @Now=@Now",
+                    cnn,
+                    SqlParameter("@WorkItemID", workItemId),
+                    SqlParameter("@Shard", shard),
+                    SqlParameter("@Now", Now)
+                );
+            });
+        }
+
         public async ValueTask FailWorkItem(int workItemId, int shard)
         {
             await _config.WithDbConnection(async cnn =>

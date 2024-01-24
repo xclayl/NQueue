@@ -168,6 +168,24 @@ public class InMemoryDb
         }
             
     }
+    
+    
+    public async ValueTask DelayWorkItem(int workItemId)
+    {
+        using var _ = await ALock.Wait(_lock);
+            
+        var wi = _workItems.Single(w => w.WorkItemId == workItemId);
+        var queue = _queues.Single(q => q.QueueName == wi.QueueName);
+        
+        _queues.Remove(queue);
+        _queues.Add(new Queue
+        {
+            QueueName = queue.QueueName,
+            LockedUntil = DateTimeOffset.Now,
+        });
+
+    }
+
 
     internal async ValueTask FailWorkItem(int workItemId)
     {
