@@ -50,6 +50,12 @@ namespace NQueue.Sample.Controllers
         {
             return new StatusCodeResult(429);
         }
+        
+        [HttpGet]
+        public IActionResult Retry()
+        {
+            return new StatusCodeResult(261); // totally made up code
+        }
 
         public async Task<IActionResult> ErrorOp()
         {

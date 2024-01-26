@@ -190,6 +190,23 @@ public class DbTests : IAsyncLifetime
     [MemberData(nameof(MyTheoryData))]
     public async Task TooManyRequests(DbType dbType)
     {
+        var endpoint = "api/NQueue/TooManyRequests";
+
+        await ShouldRetryWithoutError(dbType, endpoint);
+    }
+
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task Retry(DbType dbType)
+    {
+        var endpoint = "api/NQueue/Retry";
+
+        await ShouldRetryWithoutError(dbType, endpoint);
+    }
+
+    private async Task ShouldRetryWithoutError(DbType dbType, string endpoint)
+    {
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
@@ -203,7 +220,9 @@ public class DbTests : IAsyncLifetime
         var guid = Guid.NewGuid();
         
         // act
-        await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/TooManyRequests"));
+        await nQueueClient.Enqueue(await nQueueClient.Localhost(endpoint));
+        var enqueuedTime = DateTimeOffset.Now;
+        await Task.Delay(TimeSpan.FromSeconds(1));
         await fakeApp.FakeService.ProcessOne(app.CreateClient,
             app.Services.GetRequiredService<ILoggerFactory>());
 
@@ -248,20 +267,19 @@ public class DbTests : IAsyncLifetime
 
             {
                 await using var cmdQueue = cnn.CreateCommand();
-                cmdQueue.CommandText = "SELECT ErrorCount FROM NQueue.Queue";
+                cmdQueue.CommandText = "SELECT ErrorCount, LockedUntil FROM NQueue.Queue";
                 await using var readerQueue = await cmdQueue.ExecuteReaderAsync();
-                var queues = new List<int>();
+                var queues = new List<(int, DateTimeOffset)>();
                 while (await readerQueue.ReadAsync())
                 {
-                    queues.Add(readerQueue.GetInt32(0));
+                    queues.Add((readerQueue.GetInt32(0), readerQueue.GetDateTime(1)));
                 }
 
                 queues.Should().HaveCount(1);
-                queues.Single().Should().Be(0);
+                queues.Single().Item1.Should().Be(0);
+                queues.Single().Item2.Should().BeAfter(enqueuedTime); // this is so that other queues will have a chance to run before this queue
             }
         }
         fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
     }
-
-
 }

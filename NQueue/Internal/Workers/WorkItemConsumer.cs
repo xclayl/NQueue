@@ -130,15 +130,16 @@ namespace NQueue.Internal.Workers
                     await _config.ModifyHttpRequest(httpReq);
                     using var resp = await httpClient.SendAsync(httpReq);
 
-                    if (resp.IsSuccessStatusCode)
-                    {
-                        await query.CompleteWorkItem(request.WorkItemId, _shard);
-                        logger.LogDebug("work item completed {Shard}", _shard);
-                    }
-                    else if (resp.StatusCode == HttpStatusCode.TooManyRequests)
+                  
+                    if (resp.StatusCode == HttpStatusCode.TooManyRequests || (int)resp.StatusCode == 261) // 261 is made up.  Here, it means "retry" - progress was made, but the Work Item is not complete yet
                     {
                         await query.DelayWorkItem(request.WorkItemId, _shard);
                         logger.Log(LogLevel.Information, "work item, {HttpReqMethod} {HttpReqRequestUri}, returned status code {RespStatusCode}, rescheduling for later. {Shard}", httpReq.Method, httpReq.RequestUri, resp.StatusCode, _shard);
+                    } 
+                    else  if (resp.IsSuccessStatusCode)
+                    {
+                        await query.CompleteWorkItem(request.WorkItemId, _shard);
+                        logger.LogDebug("work item completed {Shard}", _shard);
                     }
                     else
                     {
