@@ -105,7 +105,8 @@ namespace NQueue.Testing
             {
                 hasMore = false;
                 
-                foreach (var shard in Enumerable.Range(0, conn.ShardCount))
+                var shardOrder = conn.GetShardOrderForTesting();
+                foreach (var shard in shardOrder)
                 {
                     var consumer = new WorkItemConsumer(1,
                         shard,
