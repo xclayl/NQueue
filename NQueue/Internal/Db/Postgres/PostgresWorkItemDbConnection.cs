@@ -13,6 +13,8 @@ namespace NQueue.Internal.Db.Postgres
         private readonly IDbConfig _config;
         private readonly SemaphoreSlim _lock = new(1, 1);
         private volatile bool _dbMigrationRan;
+
+        private static IReadOnlyList<int>? RotatingShardOrderForTests = null;
     
         public PostgresWorkItemDbConnection(IDbConfig config, bool isCitus): base(config.TimeZone, isCitus)
         {
@@ -94,6 +96,26 @@ namespace NQueue.Internal.Db.Postgres
         }
 
         public int ShardCount => IsCitus ? 16 : 1;
+
+
+        public IReadOnlyList<int> GetShardOrderForTesting() => ShardCount == 1
+            ? new[] { 0 }
+            : RotateShardOrder();
+
+        private IReadOnlyList<int> RotateShardOrder()
+        {
+            lock (typeof(PostgresWorkItemDbConnection))
+            {
+                if (RotatingShardOrderForTests == null || RotatingShardOrderForTests.Count != ShardCount)
+                    RotatingShardOrderForTests = Enumerable.Range(0, ShardCount).ToList();
+                else
+                    RotatingShardOrderForTests = RotatingShardOrderForTests.Skip(1)
+                        .Concat(new[] { RotatingShardOrderForTests.First() })
+                        .ToList();
+
+                return RotatingShardOrderForTests;
+            }
+        }
 
 
         public async ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck()

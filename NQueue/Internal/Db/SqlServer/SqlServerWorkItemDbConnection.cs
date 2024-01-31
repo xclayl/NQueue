@@ -115,5 +115,6 @@ namespace NQueue.Internal.Db.SqlServer
         }
 
         public int ShardCount => 1;
+        public IReadOnlyList<int> GetShardOrderForTesting() => new[] { 0 };
     }
 }

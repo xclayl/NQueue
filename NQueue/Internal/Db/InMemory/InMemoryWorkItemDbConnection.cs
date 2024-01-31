@@ -52,5 +52,6 @@ namespace NQueue.Internal.Db.InMemory
         }
 
         public int ShardCount => 1;
+        public IReadOnlyList<int> GetShardOrderForTesting() => new[] { 0 };
     }
 }

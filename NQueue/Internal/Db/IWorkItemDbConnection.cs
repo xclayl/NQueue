@@ -14,7 +14,8 @@ namespace NQueue.Internal.Db
         ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck();
         ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState();
         int ShardCount { get; }
-        
+
+        IReadOnlyList<int> GetShardOrderForTesting();
     }
 
     internal interface IWorkItemDbProcs

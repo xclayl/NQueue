@@ -139,8 +139,12 @@ namespace NQueue.Testing
         {
             
             var conn = await _config.GetWorkItemDbConnection();
+
+            var shardOrder = conn.GetShardOrderForTesting();
+                
             
-            foreach (var shard in Enumerable.Range(0, conn.ShardCount))
+            
+            foreach (var shard in shardOrder)
             {
               
                 var consumer = new WorkItemConsumer(1,
