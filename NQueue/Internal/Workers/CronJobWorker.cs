@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Cronos;
@@ -84,8 +85,17 @@ namespace NQueue.Internal.Workers
 
                     var url = string.Format(nQueueCronJob.Url, nextOccurrence ?? Now(_tz));
 
-                    await tran.EnqueueWorkItem(new Uri(url), nQueueCronJob.QueueName,
-                        $"From CronJob {state.CronJobName}", true);
+                    var currentActivity = Activity.Current;
+                    Activity.Current = null;
+                    try
+                    {
+                        await tran.EnqueueWorkItem(new Uri(url), nQueueCronJob.QueueName,
+                            $"From CronJob {state.CronJobName}", true);
+                    }
+                    finally
+                    {
+                        Activity.Current = currentActivity;
+                    }
 
                     await tran.UpdateCronJobLastRanAt(state.CronJobName);
                 }
