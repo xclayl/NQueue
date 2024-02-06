@@ -101,6 +101,8 @@ namespace NQueue.Testing
             
             var hasMore = true;
 
+            
+            
             while (hasMore)
             {
                 hasMore = false;
@@ -116,10 +118,7 @@ namespace NQueue.Testing
                         _config,
                         loggerFactory);
 
-                    var found = false;
-
-                    while (await consumer.ExecuteOne(false, _externalBaseUrls, _externalUrlCalls))
-                        found = true;
+                    var found = await consumer.ExecuteOne(false, _externalBaseUrls, _externalUrlCalls);
 
                     if (found)
                     {
