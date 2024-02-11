@@ -19,6 +19,9 @@ namespace NQueue.Internal.Db.SqlServer
 
         internal SqlServerWorkItemDbConnection(IDbConfig config): base(config.TimeZone)
         {
+            throw new Exception(
+                "The SQL Server implementation has become unmaintained. If you are interested in maintaining it, please let me know");
+            
             _config = config;
         }
 

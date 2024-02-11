@@ -1,4 +1,8 @@
 
+# SQL Server implementation is unmaintained
+If you are interested in maintaining it, please let me know.
+
+
 ## Getting Started
     CREATE USER [NQueueUser] WITH PASSWORD = 'a_$trong_p4ssword'
     

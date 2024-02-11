@@ -20,7 +20,7 @@ public class DbTests : IAsyncLifetime
         InMemory,
         Postgres,
         PostgresCitus,
-        SqlServer
+        // SqlServer
     }
 
     private readonly IReadOnlyDictionary<DbType, IDbCreator> _dbCreators = new Dictionary<DbType, IDbCreator>()
@@ -28,7 +28,7 @@ public class DbTests : IAsyncLifetime
         { DbType.InMemory, new InMemoryDbCreator() },
         { DbType.Postgres, new PostgresDbCreator() },
         { DbType.PostgresCitus, new PostgresCitusDbCreator() },
-        { DbType.SqlServer, new SqlServerDbCreator() }
+        // { DbType.SqlServer, new SqlServerDbCreator() }
     };
     
     
