@@ -4,23 +4,38 @@
 
 ## Use Postgres
 
+```sql
+    CREATE DATABASE my_database;
+    -- in the new database:
+    CREATE USER nqueueuser PASSWORD 'ihSH3jqeVb7giIgOkohX';
+    CREATE SCHEMA IF NOT EXISTS nqueue AUTHORIZATION nqueueuser;
+```
+
 ```csharp
+  services.AddHttpClient();
   services.AddNQueueHostedService((s, config) =>
     {
       var cnnBuilder = new NpgsqlConnectionStringBuilder()
       {
           Host = "localhost",
-          Database = "NQueueSample",
+          Database = "my_database",
           Username = "nqueueuser",
           Password = "ihSH3jqeVb7giIgOkohX",
       };
       cnnBuilder.SslMode = cnnBuilder.Host == "localhost" ? SslMode.Disable : SslMode.VerifyFull;
       config.CreateDbConnection = () => new ValueTask<DbConnection>(new NpgsqlConnection(cnnBuilder.ToString()));
+      config.LocalHttpAddresses = s.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>().Addresses.ToList();
       return default;
     });
 ```
 
-
+Enqueue your first work item:
+```csharp
+    private readonly INQueueClient _nQueueClient; // populated by IOC
+    public async Task MyMethod() {
+        await _nQueueClient.Enqueue(await _nQueueClient.Localhost("/MyEndpoint"));
+    }
+```
 
 ## Use SQL Server
 
