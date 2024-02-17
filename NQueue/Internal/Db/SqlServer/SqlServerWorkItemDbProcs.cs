@@ -44,7 +44,7 @@ namespace NQueue.Internal.Db.SqlServer
         }
 
 
-        public async ValueTask CompleteWorkItem(int workItemId, int shard)
+        public async ValueTask CompleteWorkItem(long workItemId, int shard)
         {
             await _config.WithDbConnection(async cnn =>
             {
@@ -58,7 +58,7 @@ namespace NQueue.Internal.Db.SqlServer
             });
         }
 
-        public async ValueTask DelayWorkItem(int workItemId, int shard)
+        public async ValueTask DelayWorkItem(long workItemId, int shard)
         {
             await _config.WithDbConnection(async cnn =>
             {
@@ -72,7 +72,7 @@ namespace NQueue.Internal.Db.SqlServer
             });
         }
 
-        public async ValueTask FailWorkItem(int workItemId, int shard)
+        public async ValueTask FailWorkItem(long workItemId, int shard)
         {
             await _config.WithDbConnection(async cnn =>
             {

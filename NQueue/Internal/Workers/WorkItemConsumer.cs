@@ -118,7 +118,7 @@ namespace NQueue.Internal.Workers
             try
             {
 
-                using var _ = StartWorkItemActivity(request);
+                // using var _ = StartWorkItemActivity(request);
                 try
                 {
                     using var httpClient = _httpClientFactory.CreateClient();

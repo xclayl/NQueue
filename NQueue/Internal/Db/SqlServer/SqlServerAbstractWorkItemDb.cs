@@ -47,6 +47,18 @@ namespace NQueue.Internal.Db.SqlServer
             };
         }
 
+        internal static Func<DbCommand, DbParameter> SqlParameter(string name, long val)
+        {
+            return (cmd) =>
+            {
+                var p = cmd.CreateParameter(); 
+                p.ParameterName = name;
+                p.DbType = DbType.Int64;
+                p.Value = val;
+                return p;
+            };
+        }
+
         internal static Func<DbCommand, DbParameter> SqlParameter(string name, bool val)
         {
             return (cmd) =>

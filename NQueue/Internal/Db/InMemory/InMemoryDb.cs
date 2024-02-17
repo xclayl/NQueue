@@ -13,7 +13,7 @@ public class InMemoryDb
     
     public record class WorkItem
     {
-        public int WorkItemId { get; init; }
+        public long WorkItemId { get; init; }
         public Uri Url { get; init; }
         public string QueueName { get; init; }
         public string? DebugInfo { get; init; }
@@ -146,7 +146,7 @@ public class InMemoryDb
         return new WorkItemInfo(next.WorkItemId, next.Url.AbsoluteUri, next.Internal);
     }
 
-    internal async ValueTask CompleteWorkItem(int workItemId)
+    internal async ValueTask CompleteWorkItem(long workItemId)
     {
         using var _ = await ALock.Wait(_lock);
 
@@ -170,7 +170,7 @@ public class InMemoryDb
     }
     
     
-    public async ValueTask DelayWorkItem(int workItemId)
+    public async ValueTask DelayWorkItem(long workItemId)
     {
         using var _ = await ALock.Wait(_lock);
             
@@ -187,7 +187,7 @@ public class InMemoryDb
     }
 
 
-    internal async ValueTask FailWorkItem(int workItemId)
+    internal async ValueTask FailWorkItem(long workItemId)
     {
         using var _ = await ALock.Wait(_lock);
             

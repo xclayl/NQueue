@@ -24,7 +24,7 @@ namespace NQueue.Internal.Db.Postgres
                 var rows = ExecuteReader("SELECT * FROM nqueue.NextWorkItem($1, $2)",
                     cnn,
                     reader => new WorkItemInfo(
-                        reader.GetInt32(reader.GetOrdinal("WorkItemId")),
+                        reader.GetInt64(reader.GetOrdinal("WorkItemId")),
                         reader.GetString(reader.GetOrdinal("Url")),
                         !reader.IsDBNull(reader.GetOrdinal("Internal"))
                             ? reader.GetString(reader.GetOrdinal("Internal"))
@@ -43,7 +43,7 @@ namespace NQueue.Internal.Db.Postgres
         }
 
 
-        public async ValueTask CompleteWorkItem(int workItemId, int shard)
+        public async ValueTask CompleteWorkItem(long workItemId, int shard)
         {
             await _config.WithDbConnection(async cnn =>
             {
@@ -57,7 +57,7 @@ namespace NQueue.Internal.Db.Postgres
             });
         }
 
-        public async ValueTask DelayWorkItem(int workItemId, int shard)
+        public async ValueTask DelayWorkItem(long workItemId, int shard)
         {
             await _config.WithDbConnection(async cnn =>
             {
@@ -71,7 +71,7 @@ namespace NQueue.Internal.Db.Postgres
             });
         }
 
-        public async ValueTask FailWorkItem(int workItemId, int shard)
+        public async ValueTask FailWorkItem(long workItemId, int shard)
         {
             await _config.WithDbConnection(async cnn =>
             {

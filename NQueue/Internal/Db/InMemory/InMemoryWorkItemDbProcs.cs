@@ -18,10 +18,10 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
 
     public ValueTask<WorkItemInfo?> NextWorkItem(int shard) => Db.NextWorkItem();
 
-    public ValueTask CompleteWorkItem(int workItemId, int shard) => Db.CompleteWorkItem(workItemId);
-    public ValueTask DelayWorkItem(int workItemId, int shard) => Db.DelayWorkItem(workItemId);
+    public ValueTask CompleteWorkItem(long workItemId, int shard) => Db.CompleteWorkItem(workItemId);
+    public ValueTask DelayWorkItem(long workItemId, int shard) => Db.DelayWorkItem(workItemId);
 
-    public ValueTask FailWorkItem(int workItemId, int shard) => Db.FailWorkItem(workItemId);
+    public ValueTask FailWorkItem(long workItemId, int shard) => Db.FailWorkItem(workItemId);
 
     public ValueTask PurgeWorkItems(int shard) => Db.PurgeWorkItems();
 
@@ -38,14 +38,14 @@ class CronWorkItemTran : ICronTransaction
     private SemaphoreSlim _lock;
     private readonly List<InMemoryDb.WorkItem> _workItems;
     private readonly List<CronJobInfo> _cronJobState;
-    private readonly Func<int> _nextId;
+    private readonly Func<long> _nextId;
     
     
     private readonly List<InMemoryDb.WorkItem> _tempWorkItems=new();
     private readonly List<CronJobInfo> _tempCronJobState = new();
     private bool _lockAcquired;
 
-    public CronWorkItemTran(SemaphoreSlim @lock, List<InMemoryDb.WorkItem> workItems, List<CronJobInfo> cronJobState, Func<int> nextId)
+    public CronWorkItemTran(SemaphoreSlim @lock, List<InMemoryDb.WorkItem> workItems, List<CronJobInfo> cronJobState, Func<long> nextId)
     {
         _lock = @lock;
         _workItems = workItems;

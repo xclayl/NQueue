@@ -51,6 +51,17 @@ namespace NQueue.Internal.Db.Postgres
             };
         }
 
+        internal static Func<DbCommand, DbParameter> SqlParameter(long val)
+        {
+            return (cmd) =>
+            {
+                var p = cmd.CreateParameter(); 
+                p.DbType = DbType.Int64;
+                p.Value = val;
+                return p;
+            };
+        }
+
         internal static Func<DbCommand, DbParameter> SqlParameter(bool val)
         {
             return (cmd) =>
