@@ -84,7 +84,7 @@ DROP PROCEDURE IF EXISTS NQueue.DelayWorkItem(
                 LOCK TABLE nqueue.workitem IN ACCESS EXCLUSIVE MODE; 
 
 
-                SELECT MAX(WorkItemId) INTO last_WorkItem_id 
+				SELECT MAX(WorkItemId) INTO last_WorkItem_id 
                 FROM (
                     SELECT WorkItemId FROM nqueue.workitem
                     UNION ALL 
@@ -99,6 +99,11 @@ DROP PROCEDURE IF EXISTS NQueue.DelayWorkItem(
                 ) a;
                 next_Queue_id := coalesce(last_Queue_id, 0) + 1;
 
+                ALTER TABLE nqueue.workitem             ALTER COLUMN WorkItemId     drop default;
+                ALTER TABLE nqueue.queue				ALTER COLUMN QueueId		drop default;
+
+				DROP SEQUENCE nqueue.workitem_workitemid_seq;
+				DROP SEQUENCE nqueue.queue_queueid_seq;
 
 
                 ALTER TABLE NQueue.Queue             DROP CONSTRAINT IF EXISTS FK_Queue_WorkItem_NextWorkItemId;
@@ -110,6 +115,7 @@ DROP PROCEDURE IF EXISTS NQueue.DelayWorkItem(
 
 
 
+
                 ALTER TABLE nqueue.workitem             ALTER COLUMN WorkItemId     TYPE bigint;
                 ALTER TABLE nqueue.workitemcompleted    ALTER COLUMN WorkItemId     TYPE bigint;
                 ALTER TABLE nqueue.queue                ALTER COLUMN NextWorkItemId TYPE bigint;
@@ -117,6 +123,14 @@ DROP PROCEDURE IF EXISTS NQueue.DelayWorkItem(
                 ALTER TABLE nqueue.workitemcompleted    ALTER COLUMN Url            TYPE text;
                 ALTER TABLE nqueue.workitemcompleted    ALTER COLUMN DebugInfo      TYPE text;
                 
+
+
+				EXECUTE 'CREATE SEQUENCE nqueue.workitem_workitemid_seq	AS bigint OWNED BY nqueue.workitem.WorkItemId	START WITH ' || next_WorkItem_id::text;
+				EXECUTE 'CREATE SEQUENCE nqueue.queue_queueid_seq		AS bigint OWNED BY nqueue.queue.QueueId			START WITH ' || next_Queue_id::text;
+
+
+                ALTER TABLE nqueue.workitem             ALTER COLUMN WorkItemId     SET DEFAULT nextval('nqueue.workitem_workitemid_seq');
+                ALTER TABLE nqueue.queue				ALTER COLUMN QueueId		SET DEFAULT nextval('nqueue.queue_queueid_seq');
 
 
 
