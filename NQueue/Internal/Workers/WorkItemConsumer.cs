@@ -44,10 +44,10 @@ namespace NQueue.Internal.Workers
 
         protected internal override async ValueTask<bool> ExecuteOne()
         {
-            return await ExecuteOne(true, Array.Empty<Uri>(), Array.Empty<Uri>());
+            return await ExecuteOne(null, true, Array.Empty<Uri>(), Array.Empty<Uri>());
         }
 
-        public async ValueTask<bool> ExecuteOne(bool runPurge, IReadOnlyList<Uri> testBaseUrls, IList<Uri> testCalls)
+        public async ValueTask<bool> ExecuteOne(string? queueName, bool runPurge, IReadOnlyList<Uri> testBaseUrls, IList<Uri> testCalls)
         {
             var logger = CreateLogger();
             logger.Log(LogLevel.Debug, "Looking for work {Shard}", _shard);
@@ -58,7 +58,9 @@ namespace NQueue.Internal.Workers
             try
             {
                 await _lock.WaitAsync();
-                request = await query.NextWorkItem(_shard);
+                request = queueName == null 
+                    ? await query.NextWorkItem(_shard)
+                    : await query.NextWorkItem(queueName, _shard);
             }
             finally
             {

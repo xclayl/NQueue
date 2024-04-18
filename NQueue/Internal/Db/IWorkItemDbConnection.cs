@@ -22,6 +22,7 @@ namespace NQueue.Internal.Db
     {
         ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson);
         ValueTask<WorkItemInfo?> NextWorkItem(int shard);
+        ValueTask<WorkItemInfo?> NextWorkItem(string queueName, int shard);
         ValueTask CompleteWorkItem(long workItemId, int shard);
         ValueTask DelayWorkItem(long workItemId, int shard);
         ValueTask FailWorkItem(long workItemId, int shard);

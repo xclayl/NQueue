@@ -118,7 +118,7 @@ namespace NQueue.Testing
                         _config,
                         loggerFactory);
 
-                    var found = await consumer.ExecuteOne(false, _externalBaseUrls, _externalUrlCalls);
+                    var found = await consumer.ExecuteOne(null, false, _externalBaseUrls, _externalUrlCalls);
 
                     if (found)
                     {
@@ -156,7 +156,7 @@ namespace NQueue.Testing
                     loggerFactory);
 
 
-                if (await consumer.ExecuteOne(false, _externalBaseUrls, _externalUrlCalls))
+                if (await consumer.ExecuteOne(null, false, _externalBaseUrls, _externalUrlCalls))
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(5));
                     await consumer.WaitUntilNoActivity();
@@ -168,6 +168,45 @@ namespace NQueue.Testing
         }
 
 
+        /// <summary>
+        /// Wait and process one (or zero) work items.
+        /// When this class is used for tests by calling AddNQueueHostedService(new NQueueHostedServiceFake(...)), then no
+        /// background activity occurs. So this method exists to search
+        /// for new WorkItems and process one.
+        /// </summary>
+        public async ValueTask ProcessOne(string queueName, Func<HttpClient> client, ILoggerFactory loggerFactory)
+        {
+            var conn = await _config.GetWorkItemDbConnection();
+
+            var shardOrder = conn.GetShardOrderForTesting();
+                
+            
+            
+            foreach (var shard in shardOrder)
+            {
+              
+                var consumer = new WorkItemConsumer(1,
+                    shard,
+                    TimeSpan.Zero,
+                    conn,
+                    new MyHttpClientFactory(client),
+                    _config,
+                    loggerFactory);
+
+
+                if (await consumer.ExecuteOne(queueName, false, _externalBaseUrls, _externalUrlCalls))
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(5));
+                    await consumer.WaitUntilNoActivity();
+                    break;
+                }
+            }
+            
+            
+        }
+
+
+        
         private class MyHttpClientFactory : IHttpClientFactory
         {
             private readonly Func<HttpClient> _client;

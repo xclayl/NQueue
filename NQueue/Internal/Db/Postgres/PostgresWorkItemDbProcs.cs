@@ -41,6 +41,129 @@ namespace NQueue.Internal.Db.Postgres
             });
 
         }
+        
+        
+        public async ValueTask<WorkItemInfo?> NextWorkItem(string queueName, int shard)
+        {
+
+	        var sql = @"
+CREATE FUNCTION pg_temp.TestingNextWorkItem (
+	pShard NQueue.WorkItem.Shard%TYPE,
+	pQueueName NQueue.WorkItem.QueueName%TYPE,
+    pNow timestamp with time zone = NULL
+) RETURNS TABLE(WorkItemId NQueue.WorkItem.WorkItemID%TYPE, Url NQueue.WorkItem.Url%TYPE, Internal NQueue.WorkItem.Internal%TYPE)
+as $$
+declare
+	vQueueID NQueue.Queue.QueueID%TYPE;
+	vWorkItemID NQueue.WorkItem.WorkItemID%TYPE;
+
+begin
+
+	IF pNow IS NULL THEN
+		pNow := CURRENT_TIMESTAMP;
+	END IF;
+
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
+	-- SET NOCOUNT ON;
+
+
+    PERFORM pg_advisory_xact_lock(-5839653868952364629 + pShard + 1);
+
+	-- import work items
+
+	WITH cte AS (
+		SELECT
+			wi.WorkItemId,
+			wi.QueueName,
+			wi.CreatedAt,
+			ROW_NUMBER() OVER (Partition By wi.QueueName ORDER BY wi.WorkItemId) AS RN
+		FROM NQueue.WorkItem wi
+		WHERE
+			wi.IsIngested = FALSE
+			AND wi.Shard = pShard
+	)
+	INSERT INTO NQueue.Queue (Name, NextWorkItemId, ErrorCount, LockedUntil, Shard)
+	SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt, pShard
+	FROM cte
+	WHERE RN = 1
+	ON CONFLICT (Shard, Name) DO NOTHING;
+
+
+	UPDATE NQueue.WorkItem wi
+	SET IsIngested = TRUE
+	FROM
+		NQueue.Queue q
+	WHERE wi.QueueName = q.Name
+		AND wi.IsIngested = FALSE
+		AND wi.Shard = pShard
+		AND wi.Shard = q.Shard;
+
+
+
+	-- take work item
+
+
+	SELECT q.QueueId, q.NextWorkItemId
+	INTO   vQueueID,  vWorkItemID
+	FROM
+		NQueue.Queue q
+	WHERE
+		q.LockedUntil < pNow
+		AND q.ErrorCount < 5
+		AND q.Shard = pShard
+		AND q.Name = pQueueName
+	ORDER BY
+		q.LockedUntil, q.NextWorkItemId
+	LIMIT 1;
+
+
+
+	IF vWorkItemID IS NOT NULL THEN
+		UPDATE NQueue.WorkItem ur
+		SET LastAttemptedAt = pNow
+		WHERE ur.WorkItemId = vWorkItemID
+			AND ur.Shard = pShard;
+
+		UPDATE NQueue.Queue ur
+		SET LockedUntil = pNow + interval '1 hour'
+		WHERE ur.QueueId = vQueueID
+			AND ur.Shard = pShard;
+	END IF;
+
+	return query
+	SELECT r.WorkItemId, r.Url, r.Internal
+		FROM NQueue.WorkItem r
+		WHERE r.WorkItemId = vWorkItemID
+			AND r.Shard = pShard;
+
+
+end; $$ language plpgsql;
+";
+	        return await _config.WithDbConnection(async cnn =>
+	        {
+		        await ExecuteNonQuery(sql, cnn);
+
+		        var rows = ExecuteReader("SELECT * FROM pg_temp.TestingNextWorkItem($1, $2, $3)",
+			        cnn,
+			        reader => new WorkItemInfo(
+				        reader.GetInt64(reader.GetOrdinal("WorkItemId")),
+				        reader.GetString(reader.GetOrdinal("Url")),
+				        !reader.IsDBNull(reader.GetOrdinal("Internal"))
+					        ? reader.GetString(reader.GetOrdinal("Internal"))
+					        : null
+			        ),
+			        SqlParameter(shard),
+			        SqlParameter(queueName),
+			        SqlParameter(NowUtc)
+		        );
+
+		        var row = await rows.SingleOrDefaultAsync();
+
+		        return row;
+
+	        });
+        }
 
 
         public async ValueTask CompleteWorkItem(long workItemId, int shard)

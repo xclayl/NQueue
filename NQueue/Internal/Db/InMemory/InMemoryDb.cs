@@ -103,7 +103,7 @@ public class InMemoryDb
         return new CronWorkItemTran(_lock, _workItems, _cronJobState, () => _nextId++);
     }
 
-    internal async ValueTask<WorkItemInfo?> NextWorkItem()
+    internal async ValueTask<WorkItemInfo?> NextWorkItem(string? queueName = null)
     {
         using var _ = await ALock.Wait(_lock);
 
@@ -123,6 +123,9 @@ public class InMemoryDb
 
         var next = _workItems.FirstOrDefault(w =>
         {
+            if (queueName != null && w.QueueName != queueName)
+                return false;
+            
             var queue = _queues.Single(q => q.QueueName == w.QueueName);
 
             if (queue.LockedUntil != null && queue.LockedUntil > now)

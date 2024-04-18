@@ -44,6 +44,11 @@ namespace NQueue.Internal.Db.SqlServer
         }
 
 
+        public async ValueTask<WorkItemInfo?> NextWorkItem(string queueName, int shard)
+        {
+            throw new NotImplementedException();
+        }
+
         public async ValueTask CompleteWorkItem(long workItemId, int shard)
         {
             await _config.WithDbConnection(async cnn =>

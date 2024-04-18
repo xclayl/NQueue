@@ -17,6 +17,8 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
         Db.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicateProtection, internalJson);
 
     public ValueTask<WorkItemInfo?> NextWorkItem(int shard) => Db.NextWorkItem();
+    
+    public ValueTask<WorkItemInfo?> NextWorkItem(string queueName, int shard) => Db.NextWorkItem(queueName);
 
     public ValueTask CompleteWorkItem(long workItemId, int shard) => Db.CompleteWorkItem(workItemId);
     public ValueTask DelayWorkItem(long workItemId, int shard) => Db.DelayWorkItem(workItemId);
