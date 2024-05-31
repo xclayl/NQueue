@@ -66,6 +66,17 @@ namespace NQueue.Testing
 
         public INQueueClient Client => _service;
         public INQueueService Service => _service;
+        
+        
+        /// <summary>
+        /// Allows you to modify the HTTP request.  I've used this to add authentication in the past, but
+        /// you can modify anything you like, even the RequestUri.
+        /// </summary>
+        public Func<HttpRequestMessage, ValueTask> ModifyHttpRequest 
+        {
+            get => _config.ModifyHttpRequest;
+            set => _config.ModifyHttpRequest = value;
+        }
 
         public Uri BaseAddress
         {
