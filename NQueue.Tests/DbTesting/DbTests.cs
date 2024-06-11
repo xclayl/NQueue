@@ -314,4 +314,38 @@ public class DbTests : IAsyncLifetime
         (await r.Content.ReadAsStringAsync()).Should().Be($"{guid}");
         fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
     }
+    
+    
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task LargeQueueName(DbType dbType)
+    {
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        var fakeApp = new FakeWebApp();
+        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        await fakeService.DeleteAllNQueueData();
+        fakeApp.FakeService = fakeService;
+
+        await using var app = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl)); 
+        var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+        var guid = Guid.NewGuid();
+        var otherGuid = Guid.NewGuid();
+        
+        // act
+        await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{otherGuid}"));
+        var queueName = new string('a', 500);
+        await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"), queueName);
+        await fakeApp.FakeService.ProcessOne(queueName, app.CreateClient,
+            app.Services.GetRequiredService<ILoggerFactory>());
+
+        // assert
+        var http = app.CreateClient();
+        using var r = await http.GetAsync(await nQueueClient.Localhost($"api/NQueue/GetMessage"));
+        r.EnsureSuccessStatusCode();
+        (await r.Content.ReadAsStringAsync()).Should().Be($"{guid}");
+        fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+    }
 }
