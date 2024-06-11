@@ -8,5 +8,6 @@ internal interface IDbConfig
 {
     TimeZoneInfo TimeZone { get; }
     ValueTask WithDbConnection(Func<DbConnection, ValueTask> action);
+    ValueTask WithDbConnectionAndRetries(Func<DbConnection, ValueTask> action);
     ValueTask<T> WithDbConnection<T>(Func<DbConnection, ValueTask<T>> action);
 }

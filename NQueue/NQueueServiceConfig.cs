@@ -111,6 +111,31 @@ namespace NQueue
                 return 0;
             });
         }
+        async ValueTask IDbConfig.WithDbConnectionAndRetries(Func<DbConnection, ValueTask> action)
+        {
+            var tries = 0;
+            const int MaxRetries = 10;
+            while (tries <= MaxRetries)
+            {
+                try
+                {
+                    await WithDbConnectionPriv(async conn =>
+                    {
+                        await action(conn);
+                        return 0;
+                    });
+                    return;
+                }
+                catch (Exception e) when (tries < MaxRetries)
+                {
+                    // do nothing
+                }
+
+                tries++;
+                await Task.Delay(TimeSpan.FromSeconds(Math.Min(Math.Pow(2, tries), 30)));
+            }
+        }
+        
         async ValueTask<T> IDbConfig.WithDbConnection<T>(Func<DbConnection, ValueTask<T>> action)
         {
             return await WithDbConnectionPriv(async conn => await action(conn));

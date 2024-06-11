@@ -168,7 +168,7 @@ end; $$ language plpgsql;
 
         public async ValueTask CompleteWorkItem(long workItemId, int shard)
         {
-            await _config.WithDbConnection(async cnn =>
+            await _config.WithDbConnectionAndRetries(async cnn =>
             {
                 await ExecuteProcedure(
                     "nqueue.CompleteWorkItem",
@@ -182,7 +182,7 @@ end; $$ language plpgsql;
 
         public async ValueTask DelayWorkItem(long workItemId, int shard)
         {
-            await _config.WithDbConnection(async cnn =>
+            await _config.WithDbConnectionAndRetries(async cnn =>
             {
                 await ExecuteProcedure(
                     "nqueue.DelayWorkItem",
@@ -196,7 +196,7 @@ end; $$ language plpgsql;
 
         public async ValueTask FailWorkItem(long workItemId, int shard)
         {
-            await _config.WithDbConnection(async cnn =>
+            await _config.WithDbConnectionAndRetries(async cnn =>
             {
                 await ExecuteProcedure(
                     "nqueue.FailWorkItem",
