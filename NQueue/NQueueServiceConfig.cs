@@ -5,6 +5,7 @@ using System.Data.Common;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using NQueue.Internal.Db;
 using NQueue.Internal.Db.InMemory;
 using NQueue.Internal.Db.Postgres;
@@ -111,7 +112,7 @@ namespace NQueue
                 return 0;
             });
         }
-        async ValueTask IDbConfig.WithDbConnectionAndRetries(Func<DbConnection, ValueTask> action)
+        async ValueTask IDbConfig.WithDbConnectionAndRetries(Func<DbConnection, ValueTask> action, ILogger logger)
         {
             var tries = 0;
             const int MaxRetries = 10;
@@ -128,7 +129,7 @@ namespace NQueue
                 }
                 catch (Exception e) when (tries < MaxRetries)
                 {
-                    // do nothing
+                    logger.LogWarning(e.ToString());
                 }
 
                 tries++;

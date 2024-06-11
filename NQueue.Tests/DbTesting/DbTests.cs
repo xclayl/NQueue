@@ -139,7 +139,7 @@ public class DbTests : IAsyncLifetime
             queuedItem.Url.Should().Be("http://localhost/api/NQueue/NoOp");
             queuedItem.Internal.Should().Be(@"{""a"": 3}");
             
-            await procs.DelayWorkItem(queuedItem.WorkItemId, shard);
+            await procs.DelayWorkItem(queuedItem.WorkItemId, shard, null);
             break;
         }
 
@@ -154,7 +154,7 @@ public class DbTests : IAsyncLifetime
             queuedItem.Url.Should().Be("http://localhost/api/NQueue/NoOp");
             queuedItem.Internal.Should().Be(@"{""a"": 3}");
             
-            await procs.CompleteWorkItem(queuedItem.WorkItemId, shard);
+            await procs.CompleteWorkItem(queuedItem.WorkItemId, shard, null);
             break;
         }
         
@@ -171,7 +171,7 @@ public class DbTests : IAsyncLifetime
             queuedItem.Url.Should().Be("http://localhost/api/NQueue/NoOp/2");
             queuedItem.Internal.Should().Be(@"{""a"": 4}");
             
-            await procs.FailWorkItem(queuedItem.WorkItemId, shard);
+            await procs.FailWorkItem(queuedItem.WorkItemId, shard, null);
             break;
         }
 

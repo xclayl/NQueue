@@ -4,6 +4,7 @@ using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using NQueue.Internal.Model;
 
 namespace NQueue.Internal.Db.InMemory;
@@ -20,10 +21,10 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
     
     public ValueTask<WorkItemInfo?> NextWorkItem(string queueName, int shard) => Db.NextWorkItem(queueName);
 
-    public ValueTask CompleteWorkItem(long workItemId, int shard) => Db.CompleteWorkItem(workItemId);
-    public ValueTask DelayWorkItem(long workItemId, int shard) => Db.DelayWorkItem(workItemId);
+    public ValueTask CompleteWorkItem(long workItemId, int shard, ILogger logger) => Db.CompleteWorkItem(workItemId);
+    public ValueTask DelayWorkItem(long workItemId, int shard, ILogger logger) => Db.DelayWorkItem(workItemId);
 
-    public ValueTask FailWorkItem(long workItemId, int shard) => Db.FailWorkItem(workItemId);
+    public ValueTask FailWorkItem(long workItemId, int shard, ILogger logger) => Db.FailWorkItem(workItemId);
 
     public ValueTask PurgeWorkItems(int shard) => Db.PurgeWorkItems();
 

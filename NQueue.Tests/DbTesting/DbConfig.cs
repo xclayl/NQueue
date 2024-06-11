@@ -2,6 +2,7 @@
 using System.Data.Common;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NQueue.Internal.Db;
 
@@ -19,7 +20,7 @@ internal class PostgresDbConfig : IDbConfig
         await action(cnn);
     }
     
-    public async ValueTask WithDbConnectionAndRetries(Func<DbConnection, ValueTask> action)
+    public async ValueTask WithDbConnectionAndRetries(Func<DbConnection, ValueTask> action, ILogger logger)
     {
         var tries = 0;
         const int MaxRetries = 10;
@@ -32,7 +33,7 @@ internal class PostgresDbConfig : IDbConfig
             }
             catch (Exception e) when (tries < MaxRetries)
             {
-                // do nothing
+                logger.LogWarning(e.ToString());
             }
 
             tries++;
@@ -63,7 +64,7 @@ internal class SqlServerDbConfig : IDbConfig
         await action(cnn);
     }
 
-    public async ValueTask WithDbConnectionAndRetries(Func<DbConnection, ValueTask> action)
+    public async ValueTask WithDbConnectionAndRetries(Func<DbConnection, ValueTask> action, ILogger logger)
     {
         await WithDbConnection(action);
     }

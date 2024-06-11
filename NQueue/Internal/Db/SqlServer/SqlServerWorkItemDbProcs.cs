@@ -2,6 +2,7 @@
 using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using NQueue.Internal.Model;
 
 namespace NQueue.Internal.Db.SqlServer
@@ -49,7 +50,7 @@ namespace NQueue.Internal.Db.SqlServer
             throw new NotImplementedException();
         }
 
-        public async ValueTask CompleteWorkItem(long workItemId, int shard)
+        public async ValueTask CompleteWorkItem(long workItemId, int shard, ILogger logger)
         {
             await _config.WithDbConnection(async cnn =>
             {
@@ -63,7 +64,7 @@ namespace NQueue.Internal.Db.SqlServer
             });
         }
 
-        public async ValueTask DelayWorkItem(long workItemId, int shard)
+        public async ValueTask DelayWorkItem(long workItemId, int shard, ILogger logger)
         {
             await _config.WithDbConnection(async cnn =>
             {
@@ -77,7 +78,7 @@ namespace NQueue.Internal.Db.SqlServer
             });
         }
 
-        public async ValueTask FailWorkItem(long workItemId, int shard)
+        public async ValueTask FailWorkItem(long workItemId, int shard, ILogger logger)
         {
             await _config.WithDbConnection(async cnn =>
             {

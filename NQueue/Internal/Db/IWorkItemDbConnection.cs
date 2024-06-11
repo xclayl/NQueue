@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using NQueue.Internal.Model;
 
 namespace NQueue.Internal.Db
@@ -23,9 +24,9 @@ namespace NQueue.Internal.Db
         ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson);
         ValueTask<WorkItemInfo?> NextWorkItem(int shard);
         ValueTask<WorkItemInfo?> NextWorkItem(string queueName, int shard);
-        ValueTask CompleteWorkItem(long workItemId, int shard);
-        ValueTask DelayWorkItem(long workItemId, int shard);
-        ValueTask FailWorkItem(long workItemId, int shard);
+        ValueTask CompleteWorkItem(long workItemId, int shard, ILogger logger);
+        ValueTask DelayWorkItem(long workItemId, int shard, ILogger logger);
+        ValueTask FailWorkItem(long workItemId, int shard, ILogger logger);
         ValueTask PurgeWorkItems(int shard);
 
 

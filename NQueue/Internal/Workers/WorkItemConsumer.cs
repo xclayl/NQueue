@@ -135,25 +135,25 @@ namespace NQueue.Internal.Workers
                   
                     if (resp.StatusCode == HttpStatusCode.TooManyRequests || (int)resp.StatusCode == 261) // 261 is made up.  Here, it means "retry" - progress was made, but the Work Item is not complete yet
                     {
-                        await query.DelayWorkItem(request.WorkItemId, _shard);
                         logger.Log(LogLevel.Information, "work item, {HttpReqMethod} {HttpReqRequestUri}, returned status code {RespStatusCode}, rescheduling for later. {Shard}", httpReq.Method, httpReq.RequestUri, resp.StatusCode, _shard);
+                        await query.DelayWorkItem(request.WorkItemId, _shard, logger);
                     } 
                     else  if (resp.IsSuccessStatusCode)
                     {
-                        await query.CompleteWorkItem(request.WorkItemId, _shard);
                         logger.LogDebug("work item completed {Shard}", _shard);
+                        await query.CompleteWorkItem(request.WorkItemId, _shard, logger);
                     }
                     else
                     {
-                        await query.FailWorkItem(request.WorkItemId, _shard);
                         logger.Log(LogLevel.Warning, "work item, {HttpReqMethod} {HttpReqRequestUri}, failed with status code {RespStatusCode}. {Shard}", httpReq.Method, httpReq.RequestUri, resp.StatusCode, _shard);
+                        await query.FailWorkItem(request.WorkItemId, _shard, logger);
                     }
 
                 }
                 catch (Exception e)
                 {
                     logger.LogError(e.ToString());
-                    await query.FailWorkItem(request.WorkItemId, _shard);
+                    await query.FailWorkItem(request.WorkItemId, _shard, logger);
                     logger.Log(LogLevel.Information, "work item faulted {Shard}", _shard);
                 }
             }
