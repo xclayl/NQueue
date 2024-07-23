@@ -53,5 +53,13 @@ namespace NQueue.Internal.Db.InMemory
 
         public int ShardCount => 1;
         public IReadOnlyList<int> GetShardOrderForTesting() => new[] { 0 };
+        public async ValueTask<IReadOnlyList<WorkItemInfoWithQueueName>> GetWorkItemsForTests()
+        {
+            var workItems = await _procs.Db.GetWorkItems();
+            return workItems
+                .Select(wi =>
+                    new WorkItemInfoWithQueueName(wi.WorkItemId, wi.Url.AbsoluteUri, wi.QueueName, wi.Internal))
+                .ToList();
+        }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NQueue.Internal;
@@ -102,8 +103,8 @@ namespace NQueue.Testing
 
         /// <summary>
         /// Wait and process all work items.  Runs until there are no Work Items to immediately take.
-        /// When this class is used for tests by calling AddNQueueHostedService(new NQueueHostedServiceFake(...)), then no
-        /// background activity occurs. So this method exists to search
+        /// When this class is used for tests by calling AddNQueueHostedService(new NQueueHostedServiceFake(...)), then
+        /// NQueueHostedServiceFake will not run background activity. So this method exists to search
         /// for new WorkItems and process them.
         /// </summary>
         public async ValueTask ProcessAll(Func<HttpClient> client, ILoggerFactory loggerFactory)
@@ -140,10 +141,64 @@ namespace NQueue.Testing
             }
         }
         
+        
+
+        /// <summary>
+        /// Wait and process all work items for queues that match.  Runs until there are no Work Items to immediately take.
+        /// When this class is used for tests by calling AddNQueueHostedService(new NQueueHostedServiceFake(...)), then
+        /// NQueueHostedServiceFake will not run background activity. So this method exists to search
+        /// for new WorkItems and process them.
+        /// </summary>
+        public async ValueTask ProcessAll(Regex queueNames, Func<HttpClient> client, ILoggerFactory loggerFactory)
+        {
+            var conn = await _config.GetWorkItemDbConnection();
+            
+       
+
+            var queues = (await conn.GetWorkItemsForTests())
+                .Select(wi => wi.QueueName)
+                .Distinct()
+                .Where(qn => queueNames.IsMatch(qn))
+                .ToList();
+            
+            while (queues.Any())
+            {
+                var queueName = queues.First();
+                
+                var shardOrder = conn.GetShardOrderForTesting();
+                foreach (var shard in shardOrder)
+                {
+                    var consumer = new WorkItemConsumer(1,
+                        shard,
+                        TimeSpan.Zero,
+                        conn,
+                        new MyHttpClientFactory(client),
+                        _config,
+                        loggerFactory);
+
+                    var found = await consumer.ExecuteOne(queueName, false, _externalBaseUrls, _externalUrlCalls);
+
+                    if (found)
+                    {
+                        await consumer.WaitUntilNoActivity();
+                        queues.Remove(queueName);
+                    }
+                }
+
+                if (!queues.Any())
+                {
+                    queues.AddRange((await conn.GetWorkItemsForTests())
+                        .Select(wi => wi.QueueName)
+                        .Distinct()
+                        .Where(qn => queueNames.IsMatch(qn)));
+                }
+            }
+        }
+        
         /// <summary>
         /// Wait and process one (or zero) work items.
-        /// When this class is used for tests by calling AddNQueueHostedService(new NQueueHostedServiceFake(...)), then no
-        /// background activity occurs. So this method exists to search
+        /// When this class is used for tests by calling AddNQueueHostedService(new NQueueHostedServiceFake(...)), then
+        /// NQueueHostedServiceFake will not run background activity. So this method exists to search
         /// for new WorkItems and process one.
         /// </summary>
         public async ValueTask ProcessOne(Func<HttpClient> client, ILoggerFactory loggerFactory)
@@ -181,8 +236,8 @@ namespace NQueue.Testing
 
         /// <summary>
         /// Wait and process one (or zero) work items.
-        /// When this class is used for tests by calling AddNQueueHostedService(new NQueueHostedServiceFake(...)), then no
-        /// background activity occurs. So this method exists to search
+        /// When this class is used for tests by calling AddNQueueHostedService(new NQueueHostedServiceFake(...)), then
+        /// NQueueHostedServiceFake will not run background activity. So this method exists to search
         /// for new WorkItems and process one.
         /// </summary>
         public async ValueTask ProcessOne(string queueName, Func<HttpClient> client, ILoggerFactory loggerFactory)

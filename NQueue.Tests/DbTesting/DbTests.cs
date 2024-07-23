@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -76,6 +77,70 @@ public class DbTests : IAsyncLifetime
         fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
     }
     
+    
+
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task ProcessAllRegEx(DbType dbType)
+    {
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        var fakeApp = new FakeWebApp();
+        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        await fakeService.DeleteAllNQueueData();
+        fakeApp.FakeService = fakeService;
+
+        await using var app = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl)); 
+        var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+        var guid = Guid.NewGuid();
+        
+        // act
+        await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"),
+            "abc_123");
+        await fakeApp.FakeService.ProcessAll(new Regex(@"abc_\d*"), app.CreateClient,
+            app.Services.GetRequiredService<ILoggerFactory>());
+
+        // assert
+        var http = app.CreateClient();
+        using var r = await http.GetAsync(await nQueueClient.Localhost($"api/NQueue/GetMessage"));
+        r.EnsureSuccessStatusCode();
+        (await r.Content.ReadAsStringAsync()).Should().Be($"{guid}");
+        fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+    }
+
+
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task ProcessAllRegEx2(DbType dbType)
+    {
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        var fakeApp = new FakeWebApp();
+        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        await fakeService.DeleteAllNQueueData();
+        fakeApp.FakeService = fakeService;
+
+        await using var app = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl)); 
+        var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+        var guid = Guid.NewGuid();
+        
+        // act
+        await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"),
+            "def_123");
+        await fakeApp.FakeService.ProcessAll(new Regex(@"abc_\d*"), app.CreateClient,
+            app.Services.GetRequiredService<ILoggerFactory>());
+
+        // assert
+        var http = app.CreateClient();
+        using var r = await http.GetAsync(await nQueueClient.Localhost($"api/NQueue/GetMessage"));
+        r.EnsureSuccessStatusCode();
+        (await r.Content.ReadAsStringAsync()).Should().NotBe($"{guid}");
+        fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+    }
+
     
     [Theory]
     [MemberData(nameof(MyTheoryData))]

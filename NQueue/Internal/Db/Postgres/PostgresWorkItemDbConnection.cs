@@ -135,5 +135,18 @@ namespace NQueue.Internal.Db.Postgres
 
         }
 
+        public async ValueTask<IReadOnlyList<WorkItemInfoWithQueueName>> GetWorkItemsForTests()
+        {
+            await EnsureDbMigrationRuns();
+            return await _config.WithDbConnection(async cnn =>
+            {
+                var rows = ExecuteReader(
+                    "SELECT wi.WorkItemId, wi.Url, wi.QueueName, wi.Internal FROM NQueue.WorkItem wi",
+                    cnn,
+                    reader => new WorkItemInfoWithQueueName(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3)) );
+
+                return await rows.ToListAsync();
+            });
+        }
     }
 }
