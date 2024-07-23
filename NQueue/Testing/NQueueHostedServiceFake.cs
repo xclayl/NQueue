@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NQueue.Internal;
+using NQueue.Internal.Db;
 using NQueue.Internal.Db.InMemory;
 using NQueue.Internal.Model;
 using NQueue.Internal.Workers;
@@ -153,13 +154,7 @@ namespace NQueue.Testing
         {
             var conn = await _config.GetWorkItemDbConnection();
             
-       
-
-            var queues = (await conn.GetWorkItemsForTests())
-                .Select(wi => wi.QueueName)
-                .Distinct()
-                .Where(qn => queueNames.IsMatch(qn))
-                .ToList();
+            var queues = await GetActiveQueues(queueNames, conn);
             
             while (queues.Any())
             {
@@ -179,20 +174,36 @@ namespace NQueue.Testing
                     var found = await consumer.ExecuteOne(queueName, false, _externalBaseUrls, _externalUrlCalls);
 
                     if (found)
-                    {
                         await consumer.WaitUntilNoActivity();
-                        queues.Remove(queueName);
-                    }
+                    
                 }
+                
+                queues.Remove(queueName);
 
                 if (!queues.Any())
                 {
-                    queues.AddRange((await conn.GetWorkItemsForTests())
-                        .Select(wi => wi.QueueName)
-                        .Distinct()
-                        .Where(qn => queueNames.IsMatch(qn)));
+                    queues = await GetActiveQueues(queueNames, conn);
                 }
             }
+        }
+
+        private static async ValueTask<List<string>> GetActiveQueues(Regex queueNames, IWorkItemDbConnection conn)
+        {
+            var now = DateTimeOffset.Now;
+
+            var lockedQueues = (await conn.GetQueuesForTesting())
+                .Where(q => q.LockedUntil == null || q.LockedUntil < now)
+                .Select(q => q.QueueName)
+                .ToList();
+            
+            var queues = (await conn.GetWorkItemsForTests())
+                .Select(wi => wi.QueueName)
+                .Distinct()
+                .Where(qn => queueNames.IsMatch(qn))
+                .Except(lockedQueues)
+                .ToList();
+
+            return queues;
         }
         
         /// <summary>

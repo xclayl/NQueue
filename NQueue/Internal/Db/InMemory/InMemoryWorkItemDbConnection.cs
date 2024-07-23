@@ -61,5 +61,12 @@ namespace NQueue.Internal.Db.InMemory
                     new WorkItemInfoWithQueueName(wi.WorkItemId, wi.Url.AbsoluteUri, wi.QueueName, wi.Internal))
                 .ToList();
         }
+
+        public async ValueTask<IReadOnlyList<QueueInfo>> GetQueuesForTesting()
+        {
+            return (await _procs.Db.GetQueues())
+                .Select(q => new QueueInfo(q.QueueName, q.LockedUntil))
+                .ToList();
+        }
     }
 }

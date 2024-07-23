@@ -148,5 +148,20 @@ namespace NQueue.Internal.Db.Postgres
                 return await rows.ToListAsync();
             });
         }
+        
+        public async ValueTask<IReadOnlyList<QueueInfo>> GetQueuesForTesting()
+        {
+            await EnsureDbMigrationRuns();
+            return await _config.WithDbConnection(async cnn =>
+            {
+                var rows = ExecuteReader(
+                    "SELECT q.Name, q.LockedUntil FROM NQueue.Queue q",
+                    cnn,
+                    reader => new QueueInfo(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetDateTime(1)));
+
+                return await rows.ToListAsync();
+            });
+        }
+        
     }
 }
