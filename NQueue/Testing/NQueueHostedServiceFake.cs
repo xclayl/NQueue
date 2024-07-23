@@ -192,7 +192,7 @@ namespace NQueue.Testing
             var now = DateTimeOffset.Now;
 
             var lockedQueues = (await conn.GetQueuesForTesting())
-                .Where(q => q.LockedUntil == null || q.LockedUntil < now)
+                .Where(q => q.LockedUntil != null && q.LockedUntil > now)
                 .Select(q => q.QueueName)
                 .ToList();
             
