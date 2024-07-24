@@ -141,9 +141,9 @@ namespace NQueue.Internal.Db.Postgres
             return await _config.WithDbConnection(async cnn =>
             {
                 var rows = ExecuteReader(
-                    "SELECT wi.WorkItemId, wi.Url, wi.QueueName, wi.Internal FROM NQueue.WorkItem wi",
+                    "SELECT wi.WorkItemId, wi.Url, wi.QueueName, wi.Internal, wi.Shard FROM NQueue.WorkItem wi",
                     cnn,
-                    reader => new WorkItemInfoWithQueueName(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3)) );
+                    reader => new WorkItemInfoWithQueueName(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3), reader.GetInt32(4)) );
 
                 return await rows.ToListAsync();
             });
@@ -155,9 +155,9 @@ namespace NQueue.Internal.Db.Postgres
             return await _config.WithDbConnection(async cnn =>
             {
                 var rows = ExecuteReader(
-                    "SELECT q.Name, q.LockedUntil FROM NQueue.Queue q",
+                    "SELECT q.Name, q.LockedUntil, q.Shard FROM NQueue.Queue q",
                     cnn,
-                    reader => new QueueInfo(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetDateTime(1)));
+                    reader => new QueueInfo(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetDateTime(1), reader.GetInt32(2)));
 
                 return await rows.ToListAsync();
             });

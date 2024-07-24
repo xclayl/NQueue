@@ -58,14 +58,14 @@ namespace NQueue.Internal.Db.InMemory
             var workItems = await _procs.Db.GetWorkItems();
             return workItems
                 .Select(wi =>
-                    new WorkItemInfoWithQueueName(wi.WorkItemId, wi.Url.AbsoluteUri, wi.QueueName, wi.Internal))
+                    new WorkItemInfoWithQueueName(wi.WorkItemId, wi.Url.AbsoluteUri, wi.QueueName, wi.Internal, 0))
                 .ToList();
         }
 
         public async ValueTask<IReadOnlyList<QueueInfo>> GetQueuesForTesting()
         {
             return (await _procs.Db.GetQueues())
-                .Select(q => new QueueInfo(q.QueueName, q.LockedUntil))
+                .Select(q => new QueueInfo(q.QueueName, q.LockedUntil, 0))
                 .ToList();
         }
     }

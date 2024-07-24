@@ -158,27 +158,25 @@ namespace NQueue.Testing
             
             while (queues.Any())
             {
-                var queueName = queues.First();
+                var queue = queues.First();
                 
-                var shardOrder = conn.GetShardOrderForTesting();
-                foreach (var shard in shardOrder)
-                {
-                    var consumer = new WorkItemConsumer(1,
-                        shard,
-                        TimeSpan.Zero,
-                        conn,
-                        new MyHttpClientFactory(client),
-                        _config,
-                        loggerFactory);
+         
+                var consumer = new WorkItemConsumer(1,
+                    queue.shard,
+                    TimeSpan.Zero,
+                    conn,
+                    new MyHttpClientFactory(client),
+                    _config,
+                    loggerFactory);
 
-                    var found = await consumer.ExecuteOne(queueName, false, _externalBaseUrls, _externalUrlCalls);
+                var found = await consumer.ExecuteOne(queue.queueName, false, _externalBaseUrls, _externalUrlCalls);
 
-                    if (found)
-                        await consumer.WaitUntilNoActivity();
-                    
-                }
+                if (found)
+                    await consumer.WaitUntilNoActivity();
                 
-                queues.Remove(queueName);
+                
+                
+                queues.RemoveAt(0);
 
                 if (!queues.Any())
                 {
@@ -187,23 +185,33 @@ namespace NQueue.Testing
             }
         }
 
-        private static async ValueTask<List<string>> GetActiveQueues(Regex queueNames, IWorkItemDbConnection conn)
+        private static async ValueTask<List<(string queueName, int shard)>> GetActiveQueues(Regex queueNamesMatch, IWorkItemDbConnection conn)
         {
             var now = DateTimeOffset.Now;
 
-            var lockedQueues = (await conn.GetQueuesForTesting())
+            var queues = await conn.GetQueuesForTesting();
+            
+            var lockedQueues = queues
                 .Where(q => q.LockedUntil != null && q.LockedUntil > now)
                 .Select(q => q.QueueName)
                 .ToList();
             
-            var queues = (await conn.GetWorkItemsForTests())
-                .Select(wi => wi.QueueName)
+            var queueNames = (await conn.GetWorkItemsForTests())
+                .Select(wi => (wi.QueueName, wi.Shard))
                 .Distinct()
-                .Where(qn => queueNames.IsMatch(qn))
-                .Except(lockedQueues)
+                .Where(qn => queueNamesMatch.IsMatch(qn.QueueName))
+                .Where(qn => !lockedQueues.Contains(qn.QueueName))
                 .ToList();
 
-            return queues;
+           var shardOrder = conn.GetShardOrderForTesting()
+                                .Select((shardId, i) => new {shardId, Order = i})
+                                .ToDictionary(kv => kv.shardId, kv => kv.Order);
+
+            queueNames = queueNames
+                .OrderBy(q => shardOrder[q.Shard])
+                .ToList();
+            
+            return queueNames;
         }
         
         /// <summary>
