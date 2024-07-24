@@ -153,13 +153,16 @@ namespace NQueue.Testing
         public async ValueTask ProcessAll(Regex queueNames, Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
             var conn = await _config.GetWorkItemDbConnection();
+
+            var queueHistory = new List<string>();
             
-            var queues = await GetActiveQueues(queueNames, conn);
+            var queues = await GetActiveQueues(queueNames, conn, queueHistory);
             
             while (queues.Any())
             {
                 var queue = queues.First();
-                
+                queueHistory.Remove(queue.queueName);
+                queueHistory.Add(queue.queueName);
          
                 var consumer = new WorkItemConsumer(1,
                     queue.shard,
@@ -180,12 +183,12 @@ namespace NQueue.Testing
 
                 if (!queues.Any())
                 {
-                    queues = await GetActiveQueues(queueNames, conn);
+                    queues = await GetActiveQueues(queueNames, conn, queueHistory);
                 }
             }
         }
 
-        private static async ValueTask<List<(string queueName, int shard)>> GetActiveQueues(Regex queueNamesMatch, IWorkItemDbConnection conn)
+        private static async ValueTask<List<(string queueName, int shard)>> GetActiveQueues(Regex queueNamesMatch, IWorkItemDbConnection conn, IReadOnlyList<string> queueHistory)
         {
             var now = DateTimeOffset.Now;
 
@@ -203,12 +206,12 @@ namespace NQueue.Testing
                 .Where(qn => !lockedQueues.Contains(qn.QueueName))
                 .ToList();
 
-           var shardOrder = conn.GetShardOrderForTesting()
-                                .Select((shardId, i) => new {shardId, Order = i})
-                                .ToDictionary(kv => kv.shardId, kv => kv.Order);
+           var queueOrder = queueHistory // larger indexes means recently ran
+                                .Select((queueName, i) => new {queueName, Order = i})
+                                .ToDictionary(kv => kv.queueName, kv => kv.Order);
 
             queueNames = queueNames
-                .OrderBy(q => shardOrder[q.Shard])
+                .OrderBy(q => queueOrder.GetValueOrDefault(q.QueueName, -1))
                 .ToList();
             
             return queueNames;
