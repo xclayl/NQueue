@@ -108,41 +108,12 @@ namespace NQueue.Testing
         /// NQueueHostedServiceFake will not run background activity. So this method exists to search
         /// for new WorkItems and process them.
         /// </summary>
-        public async ValueTask ProcessAll(Func<HttpClient> client, ILoggerFactory loggerFactory)
+        public ValueTask ProcessAll(Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
-            var conn = await _config.GetWorkItemDbConnection();
-            
-            var hasMore = true;
-
-            
-            
-            while (hasMore)
-            {
-                hasMore = false;
-                
-                var shardOrder = conn.GetShardOrderForTesting();
-                foreach (var shard in shardOrder)
-                {
-                    var consumer = new WorkItemConsumer(1,
-                        shard,
-                        TimeSpan.Zero,
-                        conn,
-                        new MyHttpClientFactory(client),
-                        _config,
-                        loggerFactory);
-
-                    var found = await consumer.ExecuteOne(null, false, _externalBaseUrls, _externalUrlCalls);
-
-                    if (found)
-                    {
-                        await consumer.WaitUntilNoActivity();
-                        hasMore = true;
-                    }
-                }
-            }
+            return ProcessAllPriv(null, client, loggerFactory);
         }
-        
-        
+
+
 
         /// <summary>
         /// Wait and process all work items for queues that match.  Runs until there are no Work Items to immediately take.
@@ -150,8 +121,13 @@ namespace NQueue.Testing
         /// NQueueHostedServiceFake will not run background activity. So this method exists to search
         /// for new WorkItems and process them.
         /// </summary>
-        public async ValueTask ProcessAll(Regex queueNames, Func<HttpClient> client, ILoggerFactory loggerFactory)
+        public ValueTask ProcessAll(Regex queueNames, Func<HttpClient> client, ILoggerFactory loggerFactory)
         {
+            return ProcessAllPriv(queueNames, client, loggerFactory);
+        }
+        private async ValueTask ProcessAllPriv(Regex? queueNames, Func<HttpClient> client, ILoggerFactory loggerFactory)
+        {
+
             var conn = await _config.GetWorkItemDbConnection();
 
             var queueHistory = new List<string>();
@@ -188,7 +164,7 @@ namespace NQueue.Testing
             }
         }
 
-        private static async ValueTask<List<(string queueName, int shard)>> GetActiveQueues(Regex queueNamesMatch, IWorkItemDbConnection conn, IReadOnlyList<string> queueHistory)
+        private static async ValueTask<List<(string queueName, int shard)>> GetActiveQueues(Regex? queueNamesMatch, IWorkItemDbConnection conn, IReadOnlyList<string> queueHistory)
         {
             var now = DateTimeOffset.Now;
 
@@ -202,7 +178,7 @@ namespace NQueue.Testing
             var queueNames = (await conn.GetWorkItemsForTests())
                 .Select(wi => (wi.QueueName, wi.Shard))
                 .Distinct()
-                .Where(qn => queueNamesMatch.IsMatch(qn.QueueName))
+                .Where(qn => queueNamesMatch?.IsMatch(qn.QueueName) ?? true)
                 .Where(qn => !lockedQueues.Contains(qn.QueueName))
                 .ToList();
 
