@@ -39,16 +39,16 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
 class CronWorkItemTran : ICronTransaction
 {
     private SemaphoreSlim _lock;
-    private readonly List<InMemoryDb.WorkItem> _workItems;
+    private readonly List<InMemoryDb.WorkItemForInMemory> _workItems;
     private readonly List<CronJobInfo> _cronJobState;
     private readonly Func<long> _nextId;
     
     
-    private readonly List<InMemoryDb.WorkItem> _tempWorkItems=new();
+    private readonly List<InMemoryDb.WorkItemForInMemory> _tempWorkItems=new();
     private readonly List<CronJobInfo> _tempCronJobState = new();
     private bool _lockAcquired;
 
-    public CronWorkItemTran(SemaphoreSlim @lock, List<InMemoryDb.WorkItem> workItems, List<CronJobInfo> cronJobState, Func<long> nextId)
+    public CronWorkItemTran(SemaphoreSlim @lock, List<InMemoryDb.WorkItemForInMemory> workItems, List<CronJobInfo> cronJobState, Func<long> nextId)
     {
         _lock = @lock;
         _workItems = workItems;
@@ -105,7 +105,7 @@ class CronWorkItemTran : ICronTransaction
             throw new Exception("In memory cron lock not acquired");
         
         queueName ??= Guid.NewGuid().ToString();
-        _tempWorkItems.Add(new InMemoryDb.WorkItem
+        _tempWorkItems.Add(new InMemoryDb.WorkItemForInMemory
         {
             WorkItemId = _nextId(),
             DebugInfo = debugInfo,

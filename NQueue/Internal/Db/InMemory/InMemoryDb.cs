@@ -11,7 +11,7 @@ namespace NQueue.Internal.Db.InMemory;
 public class InMemoryDb
 {
     
-    public record class WorkItem
+    public record class WorkItemForInMemory
     {
         public long WorkItemId { get; init; }
         public Uri Url { get; init; }
@@ -32,21 +32,21 @@ public class InMemoryDb
     
     
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private readonly List<WorkItem> _workItems = new();
-    private readonly List<WorkItem> _completedWorkItems = new();
+    private readonly List<WorkItemForInMemory> _workItems = new();
+    private readonly List<WorkItemForInMemory> _completedWorkItems = new();
     private readonly List<CronJobInfo> _cronJobState = new();
     private readonly List<Queue> _queues = new();
     private int _nextId = 23;
 
 
 
-    public async ValueTask<IReadOnlyList<WorkItem>> GetWorkItems()
+    public async ValueTask<IReadOnlyList<WorkItemForInMemory>> GetWorkItems()
     {
         using var _ = await ALock.Wait(_lock);
         return _workItems.ToList();
     }
 
-    public async ValueTask<IReadOnlyList<WorkItem>> GetCompletedWorkItems()
+    public async ValueTask<IReadOnlyList<WorkItemForInMemory>> GetCompletedWorkItems()
     {
         using var _ = await ALock.Wait(_lock);
         return _completedWorkItems.ToList();
@@ -78,7 +78,7 @@ public class InMemoryDb
                 return;
         }
 
-        _workItems.Add(new WorkItem
+        _workItems.Add(new WorkItemForInMemory
         {
             WorkItemId = _nextId++,
             Url = url,

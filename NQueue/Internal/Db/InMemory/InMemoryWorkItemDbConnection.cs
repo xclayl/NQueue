@@ -53,13 +53,12 @@ namespace NQueue.Internal.Db.InMemory
 
         public int ShardCount => 1;
         public IReadOnlyList<int> GetShardOrderForTesting() => new[] { 0 };
-        public async ValueTask<IReadOnlyList<WorkItemInfoWithQueueName>> GetWorkItemsForTests()
+        public async IAsyncEnumerable<WorkItemForTests> GetWorkItemsForTests()
         {
             var workItems = await _procs.Db.GetWorkItems();
-            return workItems
-                .Select(wi =>
-                    new WorkItemInfoWithQueueName(wi.WorkItemId, wi.Url.AbsoluteUri, wi.QueueName, wi.Internal, 0))
-                .ToList();
+            foreach (var wi in workItems)
+                yield return new WorkItemForTests(wi.WorkItemId, wi.Url, wi.QueueName, wi.DebugInfo, wi.Internal,
+                    0);
         }
 
         public async ValueTask<IReadOnlyList<QueueInfo>> GetQueuesForTesting()
@@ -67,6 +66,14 @@ namespace NQueue.Internal.Db.InMemory
             return (await _procs.Db.GetQueues())
                 .Select(q => new QueueInfo(q.QueueName, q.LockedUntil, 0))
                 .ToList();
+        }
+
+        public async IAsyncEnumerable<WorkItemForTests> GetCompletedWorkItemsForTests()
+        {
+            var workItems = await _procs.Db.GetCompletedWorkItems();
+            foreach (var wi in workItems)
+                yield return new WorkItemForTests(wi.WorkItemId, wi.Url, wi.QueueName, wi.DebugInfo, wi.Internal,
+                    0);
         }
     }
 }

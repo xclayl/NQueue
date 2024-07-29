@@ -17,8 +17,9 @@ namespace NQueue.Internal.Db
         int ShardCount { get; }
 
         IReadOnlyList<int> GetShardOrderForTesting();
-        ValueTask<IReadOnlyList<WorkItemInfoWithQueueName>> GetWorkItemsForTests();
+        IAsyncEnumerable<WorkItemForTests> GetWorkItemsForTests();
         ValueTask<IReadOnlyList<QueueInfo>> GetQueuesForTesting();
+        IAsyncEnumerable<WorkItemForTests> GetCompletedWorkItemsForTests();
     }
 
     internal interface IWorkItemDbProcs

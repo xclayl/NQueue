@@ -175,7 +175,7 @@ namespace NQueue.Testing
                 .Select(q => q.QueueName)
                 .ToList();
             
-            var queueNames = (await conn.GetWorkItemsForTests())
+            var queueNames = (await conn.GetWorkItemsForTests().ToListAsync())
                 .Select(wi => (wi.QueueName, wi.Shard))
                 .Distinct()
                 .Where(qn => queueNamesMatch?.IsMatch(qn.QueueName) ?? true)
@@ -301,10 +301,27 @@ namespace NQueue.Testing
         /// For now, you can use this to access the Work Items created for verifying your tests.
         /// </summary>
         /// <returns></returns>
+        [Obsolete("Use GetWorkItems() instead")]
         public async ValueTask<InMemoryDb?> GetInMemoryDb()
         {
             var db = await _config.GetWorkItemDbConnection();
             return (await db.Get() as InMemoryWorkItemDbProcs)?.Db;
+        }
+
+
+        public async IAsyncEnumerable<WorkItem> GetWorkItems()
+        {
+            var db = await _config.GetWorkItemDbConnection();
+
+            await foreach (var wi in db.GetWorkItemsForTests())
+                yield return WorkItem.From(wi);
+        }
+        public async IAsyncEnumerable<WorkItem> GetCompletedWorkItems()
+        {
+            var db = await _config.GetWorkItemDbConnection();
+
+            await foreach (var wi in db.GetCompletedWorkItemsForTests())
+                yield return WorkItem.From(wi);
         }
     }
 }
