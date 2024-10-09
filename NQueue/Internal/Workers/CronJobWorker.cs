@@ -24,6 +24,8 @@ namespace NQueue.Internal.Workers
             _state = state;
         }
 
+        protected override string WorkerName => "";
+
         protected internal override async ValueTask<bool> ExecuteOne()
         {
             var cronJobState = (await _workItemDbConnection.GetCronJobState())

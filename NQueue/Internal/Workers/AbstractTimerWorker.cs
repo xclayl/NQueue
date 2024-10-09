@@ -21,6 +21,7 @@ namespace NQueue.Internal.Workers
         private readonly WakeUpSource _wakeUp = new WakeUpSource();
         private readonly ILoggerFactory _loggerFactory;
 
+        protected abstract string WorkerName { get; }
 
         protected AbstractTimerWorker(TimeSpan interval, string loggerCategoryName, TimeZoneInfo tz,
             ILoggerFactory loggerFactory)
@@ -88,10 +89,10 @@ namespace NQueue.Internal.Workers
             var lastRun = lastRunBox.Value;
             var now = DateTimeOffset.Now;
             if ((now - lastRun) > _interval)
-                return (false, _loggerCategoryName, "BAD", ToTz(lastRun, _tz).ToString("O"));
+                return (false, $"{_loggerCategoryName} {WorkerName}", "BAD", ToTz(lastRun, _tz).ToString("O"));
 
 
-            return (true, _loggerCategoryName, "GOOD", ToTz(lastRun, _tz).ToString("O"));
+            return (true, $"{_loggerCategoryName} {WorkerName}", "GOOD", ToTz(lastRun, _tz).ToString("O"));
         }
 
         public void PollNow()

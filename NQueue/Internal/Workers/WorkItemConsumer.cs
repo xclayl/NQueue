@@ -41,6 +41,7 @@ namespace NQueue.Internal.Workers
         }
 
 
+        protected override string WorkerName => $"{_shard}";
 
         protected internal override async ValueTask<bool> ExecuteOne()
         {
