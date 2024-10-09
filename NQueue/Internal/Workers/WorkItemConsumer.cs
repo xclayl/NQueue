@@ -72,6 +72,7 @@ namespace NQueue.Internal.Workers
                 if (runPurge)
                     try
                     {
+                        logger.Log(LogLevel.Debug, "running purge {Shard}", _shard);
                         await _lock.WaitAsync();
                         await query.PurgeWorkItems(_shard);
                     }
@@ -86,6 +87,7 @@ namespace NQueue.Internal.Workers
             }
             
 
+            logger.Log(LogLevel.Debug, "triggering work item {Shard} {WorkItemId}", _shard, request.WorkItemId);
             if (testBaseUrls.Any(u => request.Url.StartsWith(u.AbsoluteUri)))
                 testCalls.Add(new Uri(request.Url));
             else
@@ -119,6 +121,7 @@ namespace NQueue.Internal.Workers
             await _lock.WaitAsync();
             try
             {
+                logger.Log(LogLevel.Debug, "running work item {Shard} {WorkItemId}", _shard, request.WorkItemId);
 
                 // using var _ = StartWorkItemActivity(request);
                 try
