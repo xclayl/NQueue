@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Data.Common;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace NQueue.Internal.Db.Postgres
@@ -30,16 +32,34 @@ namespace NQueue.Internal.Db.Postgres
 
         public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
         {
+            queueName ??= Guid.NewGuid().ToString();
+            
+            var shard = CalculateShard(queueName);
+            
             await ExecuteProcedure(
                 _tran, 
-                "nqueue.EnqueueWorkItem",
+                "nqueue.EnqueueWorkItem2",
                 SqlParameter(url.ToString()),
                 SqlParameter(queueName),
+                SqlParameter(shard),
                 SqlParameter(debugInfo),
                 SqlParameter(NowUtc),
                 SqlParameter(duplicateProtection),
                 SqlParameter(null)
             );
+        }
+
+        private int CalculateShard(string queueName)
+        {
+            if (!IsCitus)
+                return 0;
+            
+            using var md5 = MD5.Create();
+            var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(queueName));
+
+            var shard = bytes[0] >> 4 & 15;
+
+            return shard;
         }
 
 

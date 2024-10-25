@@ -23,7 +23,7 @@ end; $$");
             var attempts = 0;
             var highestVersionDetected = 0;
 
-            while (currentVersion != 7)
+            while (currentVersion != 8)
             {
                 attempts++;
                 if (attempts > 100)
@@ -55,6 +55,10 @@ end; $$");
                     // version "0" DB. Upgrade to version 1
 
                     currentVersion = 0;
+                }
+                else if (PostgresSchemaInfo.IsVersion08(dbObjects))
+                {
+                    currentVersion = 8;
                 }
                 else if (PostgresSchemaInfo.IsVersion07(dbObjects))
                 {
@@ -118,6 +122,10 @@ end; $$");
                 if (currentVersion == 6)
                 {
                     await new PostgresDbUpgrader07().Upgrade(tran, isCitus);
+                }
+                if (currentVersion == 7)
+                {
+                    await new PostgresDbUpgrader08().Upgrade(tran, isCitus);
                 }
             }
 

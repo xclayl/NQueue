@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Data.Common;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using NQueue.Internal.Model;
@@ -235,15 +237,22 @@ end; $$ language plpgsql;
         
         public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson)
         {
+	        
+	        queueName ??= Guid.NewGuid().ToString();
+            
+	        var shard = CalculateShard(queueName);
+
+	        
             if (tran == null)
             {
                 await _config.WithDbConnection(async cnn =>
                 {
                     await ExecuteProcedure(
-                        "nqueue.EnqueueWorkItem",
+                        "nqueue.EnqueueWorkItem2",
                         cnn,
                         SqlParameter(url.ToString()),
                         SqlParameter(queueName),
+                        SqlParameter(shard),
                         SqlParameter(debugInfo),
                         SqlParameter(NowUtc),
                         SqlParameter(duplicateProtection),
@@ -254,15 +263,29 @@ end; $$ language plpgsql;
             else
                 await ExecuteProcedure(
                     tran,
-                    "nqueue.EnqueueWorkItem",
+                    "nqueue.EnqueueWorkItem2",
                     SqlParameter(url.ToString()),
                     SqlParameter(queueName),
+                    SqlParameter(shard),
                     SqlParameter(debugInfo),
                     SqlParameter(NowUtc),
                     SqlParameter(duplicateProtection),
                     SqlParameter(internalJson)
                 );
                 
+        }
+        
+        private int CalculateShard(string queueName)
+        {
+	        if (!IsCitus)
+		        return 0;
+            
+	        using var md5 = MD5.Create();
+	        var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(queueName));
+
+	        var shard = bytes[0] >> 4 & 15;
+
+	        return shard;
         }
 
         public async ValueTask DeleteAllNQueueDataForUnitTests()
