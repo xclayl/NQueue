@@ -173,10 +173,17 @@ namespace NQueue.Internal.Workers
 
         internal async ValueTask WaitUntilNoActivity()
         {
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
             while (Interlocked.Read(ref _currentQueueRunners) > 0)
             {
                 _testingSpinWait.SpinOnce();
-                await Task.Delay(TimeSpan.FromMilliseconds(1));
+                await Task.Delay(TimeSpan.FromMilliseconds(10));
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
+            
+            if (Interlocked.Read(ref _currentQueueRunners) > 0)
+            {
+                await WaitUntilNoActivity();
             }
         }
 
