@@ -115,7 +115,7 @@ namespace NQueue.Internal.Workers
         private async void ExecuteWorkItem(WorkItemInfo request, IWorkItemDbProcs query, ILogger logger)
         {
             // "async void" is on purpose.  It means "fire and forget"
-
+            await Task.Yield(); // goal is to make async void "fire and forget" as quickly as possible.  
             
             Interlocked.Increment(ref _currentQueueRunners);
            
