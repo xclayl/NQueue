@@ -1,6 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
+using System.Data.Common;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -412,5 +416,249 @@ public class DbTests : IAsyncLifetime
         r.EnsureSuccessStatusCode();
         (await r.Content.ReadAsStringAsync()).Should().Be($"{guid}");
         fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+    }
+    
+    
+    
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task PausedQueuesIgnored(DbType dbType)
+    {
+        if (dbType == DbType.InMemory)
+            return;
+        
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        var fakeApp = new FakeWebApp();
+        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        await fakeService.DeleteAllNQueueData();
+        fakeApp.FakeService = fakeService;
+
+        await using var app = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl)); 
+        var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+        var guid = Guid.NewGuid();
+        
+        // act
+        await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"), "my-queue-name");
+
+        await using (var cnn = await _dbCreators[dbType].CreateConnection())
+        {
+            await cnn.OpenAsync();
+            await ExecuteProcedure(cnn, "NQueue.PauseQueue", 
+                SqlParameter("my-queue-name"),
+                SqlParameter(CalculateShard("my-queue-name", dbType)),
+                SqlParameter(DateTimeOffset.Now.ToUniversalTime()));
+        }
+        
+        await fakeApp.FakeService.ProcessAll(app.CreateClient,
+            app.Services.GetRequiredService<ILoggerFactory>());
+
+        // assert
+        var http = app.CreateClient();
+        using var r = await http.GetAsync(await nQueueClient.Localhost($"api/NQueue/GetMessage"));
+        r.EnsureSuccessStatusCode();
+        (await r.Content.ReadAsStringAsync()).Should().Be($"");
+        fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+    }
+    
+    
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task KeepQueuePausedAfterCompletingWorkItem(DbType dbType)
+    {
+        if (dbType == DbType.InMemory)
+            return;
+        
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        var fakeApp = new FakeWebApp();
+        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        await fakeService.DeleteAllNQueueData();
+        fakeApp.FakeService = fakeService;
+
+        await using var app = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl)); 
+        var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+        var guid = Guid.NewGuid();
+        
+        // act
+        await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"), "my-queue-name");
+
+        await using (var cnn = await _dbCreators[dbType].CreateConnection())
+        {
+            await cnn.OpenAsync();
+
+            var workItems = new List<long>();
+            await using (var cmd = cnn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT WorkItemID FROM NQueue.WorkItem";
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    workItems.Add(reader.GetInt64(0));
+                }
+            }
+
+            var workItemId = workItems.Single();
+            
+            await ExecuteProcedure(cnn, "NQueue.PauseQueue", 
+                SqlParameter("my-queue-name"),
+                SqlParameter(CalculateShard("my-queue-name", dbType)),
+                SqlParameter(DateTimeOffset.Now.ToUniversalTime()));
+
+
+            
+            var dbCnn = await _dbCreators[dbType].CreateWorkItemDbConnection();
+
+            var procs = await dbCnn.Get();
+
+            await procs.CompleteWorkItem(workItemId, CalculateShard("my-queue-name", dbType), null);
+        }
+        
+        
+        // assert
+        
+        await using (var cnn = await _dbCreators[dbType].CreateConnection())
+        {
+            await cnn.OpenAsync();
+        
+            await using var cmd = cnn.CreateCommand();
+            cmd.CommandText = "SELECT IsPaused FROM NQueue.Queue";
+            await using var reader = await cmd.ExecuteReaderAsync();
+            var workItems = new List<bool>();
+            while (await reader.ReadAsync())
+            {
+                workItems.Add(reader.GetBoolean(0));
+            }
+
+            workItems.Single().Should().Be(true);
+        
+        }
+        
+        fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+    }
+    
+    
+    
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task PauseQueueBeforeExists(DbType dbType)
+    {
+        if (dbType == DbType.InMemory)
+            return;
+        
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        var fakeApp = new FakeWebApp();
+        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        await fakeService.DeleteAllNQueueData();
+        fakeApp.FakeService = fakeService;
+
+        await using var app = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl)); 
+        var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+        var guid = Guid.NewGuid();
+        
+        // act
+
+        await using (var cnn = await _dbCreators[dbType].CreateConnection())
+        {
+            await cnn.OpenAsync();
+
+            await ExecuteProcedure(cnn, "NQueue.PauseQueue", 
+                SqlParameter("my-queue-name"),
+                SqlParameter(CalculateShard("my-queue-name", dbType)),
+                SqlParameter(DateTimeOffset.Now.ToUniversalTime()));
+        }
+        
+        await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"), "my-queue-name");
+        
+        
+        await fakeApp.FakeService.ProcessAll(new Regex(@"abc_\d*"), app.CreateClient,
+            app.Services.GetRequiredService<ILoggerFactory>());
+        
+        // assert
+        
+        var http = app.CreateClient();
+        using var r = await http.GetAsync(await nQueueClient.Localhost($"api/NQueue/GetMessage"));
+        r.EnsureSuccessStatusCode();
+        (await r.Content.ReadAsStringAsync()).Should().Be($"");
+        
+        await using (var cnn = await _dbCreators[dbType].CreateConnection())
+        {
+            await cnn.OpenAsync();
+        
+            await using var cmd = cnn.CreateCommand();
+            cmd.CommandText = "SELECT IsPaused FROM NQueue.Queue";
+            await using var reader = await cmd.ExecuteReaderAsync();
+            var workItems = new List<bool>();
+            while (await reader.ReadAsync())
+            {
+                workItems.Add(reader.GetBoolean(0));
+            }
+
+            workItems.Single().Should().Be(true);
+        
+        }
+        
+        
+        fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+    }
+    
+    
+    private static async ValueTask ExecuteProcedure(DbConnection cnn, string procedure, params Func<DbCommand, DbParameter>[] ps)
+    {
+        await using var cmd = cnn.CreateCommand();
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.CommandText = procedure;
+        cmd.Parameters.AddRange(ps.Select(p => p(cmd)).ToArray());
+        await cmd.ExecuteNonQueryAsync();
+    }
+    
+    private static Func<DbCommand, DbParameter> SqlParameter(string? val)
+    {
+        return (cmd) =>
+        {
+            var p = cmd.CreateParameter(); // new SqlParameter(name, SqlDbType.NVarChar, val?.Length ?? 1);
+            p.DbType = System.Data.DbType.String;
+            p.Value = val ?? (object)DBNull.Value;
+            return p;
+        };
+    }
+    private static Func<DbCommand, DbParameter> SqlParameter(int val)
+    {
+        return (cmd) =>
+        {
+            var p = cmd.CreateParameter(); // new SqlParameter(name, SqlDbType.Int);
+            p.DbType = System.Data.DbType.Int32;
+            p.Value = val;
+            return p;
+        };
+    }        
+    private static Func<DbCommand, DbParameter> SqlParameter(DateTimeOffset val)
+    {
+        return (cmd) =>
+        {
+            var p = cmd.CreateParameter(); // new SqlParameter(name, SqlDbType.DateTimeOffset);
+            p.DbType = System.Data.DbType.DateTimeOffset;
+            p.Value = val;
+            return p;
+        };
+    }
+    private static int CalculateShard(string queueName, DbType dbType)
+    {
+        if (dbType != DbType.PostgresCitus)
+            return 0;
+            
+        using var md5 = MD5.Create();
+        var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(queueName));
+
+        var shard = bytes[0] >> 4 & 15;
+
+        return shard;
     }
 }

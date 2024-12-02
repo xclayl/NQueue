@@ -141,7 +141,7 @@ namespace NQueue.Internal.Db.Postgres
             var list = await _config.WithDbConnection(async cnn =>
             {
                 var rows = ExecuteReader(
-                    "SELECT wi.WorkItemId, wi.Url, wi.QueueName, wi.DebugInfo, wi.Internal, wi.Shard FROM NQueue.WorkItem wi",
+                    "SELECT wi.WorkItemId, wi.Url, wi.QueueName, wi.DebugInfo, wi.Internal, wi.Shard FROM NQueue.WorkItem wi WHERE wi.WorkItemId NOT IN (SELECT q.NextWorkItemID FROM NQueue.Queue q WHERE q.IsPaused)",
                     cnn,
                     reader => new WorkItemForTests(reader.GetInt64(0), 
                         new Uri(reader.GetString(1)), 

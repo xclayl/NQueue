@@ -86,8 +86,8 @@ begin
 			wi.IsIngested = FALSE
 			AND wi.Shard = pShard
 	)
-	INSERT INTO NQueue.Queue (Name, NextWorkItemId, ErrorCount, LockedUntil, Shard)
-	SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt, pShard
+	INSERT INTO NQueue.Queue (Name, NextWorkItemId, ErrorCount, LockedUntil, Shard, IsPaused)
+	SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt, pShard, FALSE
 	FROM cte
 	WHERE RN = 1
 	ON CONFLICT (Shard, Name) DO NOTHING;
