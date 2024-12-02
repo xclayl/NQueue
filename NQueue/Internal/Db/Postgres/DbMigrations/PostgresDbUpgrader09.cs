@@ -11,13 +11,8 @@ public class PostgresDbUpgrader09
     {
 
 	    var sql = @"
-			ALTER TABLE NQueue.Queue ADD COLUMN IF NOT EXISTS IsPaused boolean NULL;
-
-
-			UPDATE NQueue.Queue SET IsPaused = false WHERE IsPaused IS NULL;
-
-
-			ALTER TABLE NQueue.Queue ALTER COLUMN IsPaused SET NOT NULL;
+			ALTER TABLE NQueue.Queue ADD COLUMN IF NOT EXISTS IsPaused boolean NOT NULL DEFAULT FALSE;
+			ALTER TABLE NQueue.Queue ALTER COLUMN IsPaused DROP DEFAULT;
 
 
 			DROP INDEX IF EXISTS NQueue.IX_NQueue_Queue_LockedUntil_NextWorkItemId;
