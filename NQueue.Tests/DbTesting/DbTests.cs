@@ -610,11 +610,75 @@ public class DbTests : IAsyncLifetime
     }
     
     
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task ResumeAPausedQueueBeforeQueueExisted(DbType dbType)
+    {
+        if (dbType == DbType.InMemory)
+            return;
+        
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        var fakeApp = new FakeWebApp();
+        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        await fakeService.DeleteAllNQueueData();
+        fakeApp.FakeService = fakeService;
+
+        await using var app = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl)); 
+        var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+        var guid = Guid.NewGuid();
+        
+        // act
+
+        await using (var cnn = await _dbCreators[dbType].CreateConnection())
+        {
+            await cnn.OpenAsync();
+
+            await ExecuteProcedure(cnn, "NQueue.PauseQueue", 
+                SqlParameter("my-queue-name"),
+                SqlParameter(CalculateShard("my-queue-name", dbType)),
+                SqlParameter(DateTimeOffset.Now.ToUniversalTime()));
+        }
+        
+        await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"), "my-queue-name");
+        
+        await using (var cnn = await _dbCreators[dbType].CreateConnection())
+        {
+            await cnn.OpenAsync();
+
+            await ExecuteNonQuery(cnn, "UPDATE NQueue.Queue SET IsPaused = FALSE");
+        }
+
+        
+        await fakeApp.FakeService.ProcessAll(app.CreateClient, app.Services.GetRequiredService<ILoggerFactory>());
+        
+        // assert
+        
+        var http = app.CreateClient();
+        using var r = await http.GetAsync(await nQueueClient.Localhost($"api/NQueue/GetMessage"));
+        r.EnsureSuccessStatusCode();
+        (await r.Content.ReadAsStringAsync()).Should().Be($"{guid}");
+        
+        
+        
+        fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+    }
+    
     private static async ValueTask ExecuteProcedure(DbConnection cnn, string procedure, params Func<DbCommand, DbParameter>[] ps)
     {
         await using var cmd = cnn.CreateCommand();
         cmd.CommandType = CommandType.StoredProcedure;
         cmd.CommandText = procedure;
+        cmd.Parameters.AddRange(ps.Select(p => p(cmd)).ToArray());
+        await cmd.ExecuteNonQueryAsync();
+    }
+    
+    private static async ValueTask ExecuteNonQuery(DbConnection cnn, string sql, params Func<DbCommand, DbParameter>[] ps)
+    {
+        await using var cmd = cnn.CreateCommand();
+        cmd.CommandText = sql;
         cmd.Parameters.AddRange(ps.Select(p => p(cmd)).ToArray());
         await cmd.ExecuteNonQueryAsync();
     }

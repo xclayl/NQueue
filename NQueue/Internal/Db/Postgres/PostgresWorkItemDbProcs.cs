@@ -115,6 +115,7 @@ begin
 		q.LockedUntil < pNow
 		AND q.ErrorCount < 5
 		AND q.Shard = pShard
+		AND q.IsPaused = FALSE
 		AND q.Name = pQueueName
 	ORDER BY
 		q.LockedUntil, q.NextWorkItemId

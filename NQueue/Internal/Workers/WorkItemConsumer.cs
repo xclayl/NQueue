@@ -91,6 +91,10 @@ namespace NQueue.Internal.Workers
             logger.Log(LogLevel.Debug, "triggering work item {Shard} {WorkItemId}", _shard, request.WorkItemId);
             if (testBaseUrls.Any(u => request.Url.StartsWith(u.AbsoluteUri)))
                 testCalls.Add(new Uri(request.Url));
+            else if (request.Url == "noop:")
+            { 
+                await query.CompleteWorkItem(request.WorkItemId, _shard, logger);
+            }
             else
                 ExecuteWorkItem(request, query, logger);
 
