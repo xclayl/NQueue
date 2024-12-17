@@ -24,7 +24,7 @@ namespace NQueue.Internal.Db
 
     internal interface IWorkItemDbProcs
     {
-        ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson);
+        ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson, string? blockQueueName);
         ValueTask<WorkItemInfo?> NextWorkItem(int shard);
         ValueTask<WorkItemInfo?> NextWorkItem(string queueName, int shard);
         ValueTask CompleteWorkItem(long workItemId, int shard, ILogger logger);
@@ -39,7 +39,7 @@ namespace NQueue.Internal.Db
     internal interface ICronTransaction : IAsyncDisposable
     {
         ValueTask CommitAsync();
-        ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection);
+        ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection, string? blockQueueName);
         ValueTask CreateCronJob(string name);
         ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(string cronJobName);
         ValueTask UpdateCronJobLastRanAt(string cronJobName);

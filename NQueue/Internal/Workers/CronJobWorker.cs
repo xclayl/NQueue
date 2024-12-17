@@ -87,7 +87,7 @@ namespace NQueue.Internal.Workers
                     var url = string.Format(nQueueCronJob.Url, nextOccurrence ?? Now(_tz));
 
                     await tran.EnqueueWorkItem(new Uri(url), nQueueCronJob.QueueName,
-                        $"From CronJob {state.CronJobName}", true);
+                        $"From CronJob {state.CronJobName}", true, null);
 
                     await tran.UpdateCronJobLastRanAt(state.CronJobName);
                 }

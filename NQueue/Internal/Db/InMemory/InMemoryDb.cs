@@ -21,12 +21,14 @@ public class InMemoryDb
         public string? Internal { get; init; }
         public bool DuplicateProtection { get; init; }
         public int FailCount { get; init; } = 0;
+        public string? BlockQueueName { get; init; }
     }
 
     public class Queue
     {
         public string QueueName { get; init; }
         public DateTimeOffset? LockedUntil { get; init; }
+        public List<long> BlockedBy { get; } = new();
     }
     
     
@@ -58,7 +60,7 @@ public class InMemoryDb
         return _queues.ToList();
     }
 
-    internal async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson)
+    internal async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson, string? blockQueueName)
     {
         if (tran != null)
             throw new Exception("The in-memory NQueue implementation is not compatible with DB transactions.");
@@ -86,6 +88,7 @@ public class InMemoryDb
             DebugInfo = debugInfo,
             IsIngested = false,
             Internal = internalJson,
+            BlockQueueName = blockQueueName,
         });
             
                 
@@ -117,6 +120,15 @@ public class InMemoryDb
                     LockedUntil = null,
                 });
             }
+
+            if (wi.BlockQueueName != null)
+            {
+                var queueToBlock = _queues.Find(q => q.QueueName == wi.BlockQueueName);
+                if (queueToBlock == null)
+                    throw new Exception($"Queue {wi.QueueName} is not in the queue.");
+
+                queueToBlock.BlockedBy.Add(wi.WorkItemId);
+            }
         }
 
         var now = DateTimeOffset.Now;
@@ -129,6 +141,9 @@ public class InMemoryDb
             var queue = _queues.Single(q => q.QueueName == w.QueueName);
 
             if (queue.LockedUntil != null && queue.LockedUntil > now)
+                return false;
+            
+            if (queue.BlockedBy.Count > 0)
                 return false;
 
             return true;
@@ -156,6 +171,16 @@ public class InMemoryDb
         var wi = _workItems.Single(w => w.WorkItemId == workItemId);
 
         var queue = _queues.Single(q => q.QueueName == wi.QueueName);
+
+        if (wi.BlockQueueName != null)
+        {
+            var blockedQueue = _queues.Single(q => q.QueueName == wi.BlockQueueName);
+            if (blockedQueue == null)
+                throw new Exception($"Queue {wi.QueueName} is not in the queue.");
+            
+            blockedQueue.BlockedBy.RemoveAll(b => b == workItemId);
+        }
+            
 
         _workItems.Remove(wi);
         _completedWorkItems.Add(wi);

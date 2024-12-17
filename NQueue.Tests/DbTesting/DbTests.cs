@@ -194,7 +194,7 @@ public class DbTests : IAsyncLifetime
 
 
         await procs.EnqueueWorkItem(null, new Uri("http://localhost/api/NQueue/NoOp"), "queue-name", "debug-info", false,
-            @"{""a"": 3}");
+            @"{""a"": 3}", null);
         
         
         
@@ -228,7 +228,7 @@ public class DbTests : IAsyncLifetime
         }
         
         await procs.EnqueueWorkItem(null, new Uri("http://localhost/api/NQueue/NoOp/2"), "queue-name", "debug-info", false,
-            @"{""a"": 4}");
+            @"{""a"": 4}", null);
 
 
         foreach (var shard in Enumerable.Range(0, dbCnn.ShardCount))
@@ -254,6 +254,62 @@ public class DbTests : IAsyncLifetime
     }
 
     
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task ExecuteBlockingStoredProcs(DbType dbType)
+    {
+        // arrange 
+        var dbCnn = await _dbCreators[dbType].CreateWorkItemDbConnection();
+
+        var procs = await dbCnn.Get();
+        await procs.DeleteAllNQueueDataForUnitTests();
+
+        var item = await procs.NextWorkItem(0);
+        item.Should().BeNull();
+
+
+        var parentShard = CalculateShard("parent-queue", dbType);
+
+        await procs.EnqueueWorkItem(null, new Uri("http://localhost/api/NQueue/NoOp"), "parent-queue", "debug-info", false,
+            @"{""a"": 3}", null);
+        
+        
+        
+
+        var parentQueuedItem = await procs.NextWorkItem(parentShard);
+        if (parentQueuedItem == null)
+            throw new Exception("Could not find parent queue item");
+
+     
+        var childShard = CalculateShard("child-queue", dbType);
+        await procs.EnqueueWorkItem(null, new Uri("http://localhost/api/NQueue/NoOp"), "child-queue", "debug-info", false,
+            @"{""a"": 3}", "parent-queue");
+
+
+        
+       
+        
+        var childQueuedItem = await procs.NextWorkItem(childShard);
+        childQueuedItem.Should().NotBeNull();
+        
+        await procs.DelayWorkItem(parentQueuedItem.WorkItemId, parentShard, null);
+        
+        parentQueuedItem = await procs.NextWorkItem(parentShard);
+        parentQueuedItem.Should().BeNull();
+        
+        await procs.CompleteWorkItem(childQueuedItem.WorkItemId, childShard, null);
+        
+
+        
+        parentQueuedItem = await procs.NextWorkItem(parentShard);
+        parentQueuedItem.Should().NotBeNull();
+        
+        await procs.CompleteWorkItem(parentQueuedItem.WorkItemId, parentShard, null);
+        
+
+    }
+
     
     [Theory]
     [MemberData(nameof(MyTheoryData))]

@@ -30,7 +30,7 @@ namespace NQueue.Internal.Db.Postgres
             await _tran.CommitAsync();
         }
 
-        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
+        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection, string? blockQueueName)
         {
             queueName ??= Guid.NewGuid().ToString();
             
@@ -45,7 +45,9 @@ namespace NQueue.Internal.Db.Postgres
                 SqlParameter(debugInfo),
                 SqlParameter(NowUtc),
                 SqlParameter(duplicateProtection),
-                SqlParameter(null)
+                SqlParameter((string?)null), 
+                SqlParameter(blockQueueName != null ? CalculateShard(blockQueueName) : null),
+                SqlParameter(blockQueueName)
             );
         }
 

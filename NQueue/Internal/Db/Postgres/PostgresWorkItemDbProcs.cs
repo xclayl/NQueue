@@ -59,6 +59,11 @@ as $$
 declare
 	vQueueID NQueue.Queue.QueueID%TYPE;
 	vWorkItemID NQueue.WorkItem.WorkItemID%TYPE;
+	vBlockingMessageID NQueue.BlockingMessage.BlockingMessageID%TYPE;
+	vBlockingQueueName NQueue.BlockingMessage.QueueName%TYPE;
+	vBlockingIsCreatingBlock NQueue.BlockingMessage.IsCreatingBlock%TYPE;
+	vBlockingWorkItemId NQueue.BlockingMessage.BlockingWorkItemId%TYPE;
+	vBlockingShard NQueue.BlockingMessage.BlockingShard%TYPE;
 
 begin
 
@@ -73,7 +78,7 @@ begin
 
     PERFORM pg_advisory_xact_lock(-5839653868952364629 + pShard + 1);
 
-	-- import work items
+	--------- import work items ---------
 
 	WITH cte AS (
 		SELECT
@@ -86,8 +91,8 @@ begin
 			wi.IsIngested = FALSE
 			AND wi.Shard = pShard
 	)
-	INSERT INTO NQueue.Queue (Name, NextWorkItemId, ErrorCount, LockedUntil, Shard, IsPaused)
-	SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt, pShard, FALSE
+	INSERT INTO NQueue.Queue (Name, NextWorkItemId, ErrorCount, LockedUntil, Shard, IsPaused, BlockedBy)
+	SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt, pShard, FALSE, ARRAY[]::nqueue.block[]
 	FROM cte
 	WHERE RN = 1
 	ON CONFLICT (Shard, Name) DO NOTHING;
@@ -103,8 +108,59 @@ begin
 		AND wi.Shard = q.Shard;
 
 
+	--------- process blocking messages ---------
 
-	-- take work item
+
+	SELECT b.BlockingMessageId, b.QueueName, b.IsCreatingBlock, b.BlockingWorkItemId, b.BlockingShard
+	INTO   vBlockingMessageId,  vBlockingQueueName, vBlockingIsCreatingBlock, vBlockingWorkItemId, vBlockingShard
+	FROM
+		NQueue.BlockingMessage b
+	WHERE
+		b.QueueShard = pShard
+	ORDER BY
+		b.BlockingMessageId
+	LIMIT 1;
+
+	WHILE vBlockingMessageId IS NOT NULL LOOP
+		
+
+		IF vBlockingIsCreatingBlock THEN
+			UPDATE NQueue.Queue q
+			SET BlockedBy = BlockedBy || (vBlockingWorkItemId, vBlockingShard)::nqueue.block
+			WHERE q.Shard = pShard 
+				AND q.Name = vBlockingQueueName;
+		ELSE
+			UPDATE NQueue.Queue q
+			SET BlockedBy = array(
+                SELECT ((elem).WorkItemId, (elem).Shard)::nqueue.block
+                FROM unnest(q.BlockedBy) AS elem
+                WHERE (elem).WorkItemId <> vBlockingWorkItemId AND (elem).Shard <> vBlockingShard
+			)
+			WHERE q.Shard = pShard 
+				AND q.Name = vBlockingQueueName;
+		END IF; 		
+
+
+
+		DELETE FROM NQueue.BlockingMessage b WHERE b.QueueShard = pShard AND b.BlockingMessageId = vBlockingMessageId;
+
+
+		SELECT b.BlockingMessageId, b.QueueName, b.IsCreatingBlock, b.BlockingWorkItemId, b.BlockingShard
+		INTO   vBlockingMessageId,  vBlockingQueueName, vBlockingIsCreatingBlock, vBlockingWorkItemId, vBlockingShard
+		FROM
+			NQueue.BlockingMessage b
+		WHERE
+			b.QueueShard = pShard
+		ORDER BY
+			b.BlockingMessageId
+		LIMIT 1;
+
+	END LOOP;
+
+	
+
+
+	--------- take work item ---------
 
 
 	SELECT q.QueueId, q.NextWorkItemId
@@ -116,6 +172,7 @@ begin
 		AND q.ErrorCount < 5
 		AND q.Shard = pShard
 		AND q.IsPaused = FALSE
+		AND cardinality(q.BlockedBy) = 0
 		AND q.Name = pQueueName
 	ORDER BY
 		q.LockedUntil, q.NextWorkItemId
@@ -140,7 +197,6 @@ begin
 		FROM NQueue.WorkItem r
 		WHERE r.WorkItemId = vWorkItemID
 			AND r.Shard = pShard;
-
 
 end; $$ language plpgsql;
 ";
@@ -236,7 +292,7 @@ end; $$ language plpgsql;
 
         
         
-        public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson)
+        public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson, string? blockQueueName)
         {
 	        
 	        queueName ??= Guid.NewGuid().ToString();
@@ -257,7 +313,9 @@ end; $$ language plpgsql;
                         SqlParameter(debugInfo),
                         SqlParameter(NowUtc),
                         SqlParameter(duplicateProtection),
-                        SqlParameter(internalJson)
+                        SqlParameter(internalJson), 
+                        SqlParameter(blockQueueName != null ? CalculateShard(blockQueueName) : null),
+                        SqlParameter(blockQueueName)
                     );
                 });
             }
@@ -271,7 +329,9 @@ end; $$ language plpgsql;
                     SqlParameter(debugInfo),
                     SqlParameter(NowUtc),
                     SqlParameter(duplicateProtection),
-                    SqlParameter(internalJson)
+                    SqlParameter(internalJson), 
+                    SqlParameter(blockQueueName != null ? CalculateShard(blockQueueName) : null),
+                    SqlParameter(blockQueueName)
                 );
                 
         }

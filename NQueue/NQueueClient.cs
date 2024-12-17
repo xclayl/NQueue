@@ -26,8 +26,10 @@ namespace NQueue
         /// identify the code that created a Work Item that failed to help debug my code.</param>
         /// <param name="duplicatePrevention">If true, it won't add this Work Item if an identical Work Item
         /// Already exists.</param>
+        /// <param name="blockQueueName">If set, prevents the queue from running again until this
+        /// Work Item completes</param>
         ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null,
-            bool duplicatePrevention = false);
+            bool duplicatePrevention = false, string? blockQueueName = null);
 
         /// <summary>
         /// Helper method to dynamically determine the local host URL.  Useful when calling Enqueue()
@@ -105,7 +107,7 @@ myFakeNQueueService.BaseAddress = factory.Server.BaseAddress;
 
 
         public async ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null,
-            bool duplicatePrevention = false)
+            bool duplicatePrevention = false, string? blockQueueName = null)
         {
             var config = await _configFactory.GetConfig();
             var conn = await config.GetWorkItemDbConnection();
@@ -132,7 +134,7 @@ myFakeNQueueService.BaseAddress = factory.Server.BaseAddress;
 
             
             
-            await query.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicatePrevention, internalJson);
+            await query.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicatePrevention, internalJson, blockQueueName);
             
             if (tran == null)
                 _state?.PollNow();

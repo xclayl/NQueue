@@ -14,8 +14,8 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
     public readonly InMemoryDb Db = new();
 
     public ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo,
-        bool duplicateProtection, string? internalJson) =>
-        Db.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicateProtection, internalJson);
+        bool duplicateProtection, string? internalJson, string? blockQueueName) =>
+        Db.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicateProtection, internalJson, blockQueueName);
 
     public ValueTask<WorkItemInfo?> NextWorkItem(int shard) => Db.NextWorkItem();
     
@@ -98,7 +98,7 @@ class CronWorkItemTran : ICronTransaction
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
+    public ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection, string? blockQueueName)
     {
         
         if (!_lockAcquired)
@@ -111,7 +111,8 @@ class CronWorkItemTran : ICronTransaction
             DebugInfo = debugInfo,
             Url = url,
             QueueName = queueName,
-            DuplicateProtection = true
+            DuplicateProtection = true,
+            BlockQueueName = blockQueueName
         });
         return ValueTask.CompletedTask;
     }
