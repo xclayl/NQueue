@@ -305,7 +305,7 @@ end; $$ language plpgsql;
                 await _config.WithDbConnection(async cnn =>
                 {
                     await ExecuteProcedure(
-                        "nqueue.EnqueueWorkItem2",
+                        "nqueue.EnqueueWorkItem",
                         cnn,
                         SqlParameter(url.ToString()),
                         SqlParameter(queueName),
@@ -322,7 +322,7 @@ end; $$ language plpgsql;
             else
                 await ExecuteProcedure(
                     tran,
-                    "nqueue.EnqueueWorkItem2",
+                    "nqueue.EnqueueWorkItem",
                     SqlParameter(url.ToString()),
                     SqlParameter(queueName),
                     SqlParameter(shard),

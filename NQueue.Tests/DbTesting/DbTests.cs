@@ -722,6 +722,62 @@ public class DbTests : IAsyncLifetime
         fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
     }
     
+    
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task CompletePausedQueue(DbType dbType)
+    {
+        if (dbType == DbType.InMemory)
+            return;
+        
+        var dbCnn = await _dbCreators[dbType].CreateWorkItemDbConnection();
+
+        var procs = await dbCnn.Get();
+        await procs.DeleteAllNQueueDataForUnitTests();
+        
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        var fakeApp = new FakeWebApp();
+        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        await fakeService.DeleteAllNQueueData();
+        fakeApp.FakeService = fakeService;
+
+        await using var app = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl)); 
+        var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+        var guid = Guid.NewGuid();
+        
+        // act
+        await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"), "my-queue-name");
+
+
+
+        var workItem = await procs.NextWorkItem(CalculateShard("my-queue-name", dbType));
+        workItem.Should().NotBeNull();
+        
+        await using (var cnn = await _dbCreators[dbType].CreateConnection())
+        {
+            await cnn.OpenAsync();
+            await ExecuteProcedure(cnn, "NQueue.PauseQueue", 
+                SqlParameter("my-queue-name"),
+                SqlParameter(CalculateShard("my-queue-name", dbType)),
+                SqlParameter(DateTimeOffset.Now.ToUniversalTime()));
+        }
+        
+        
+        await procs.CompleteWorkItem(workItem.WorkItemId, CalculateShard("my-queue-name", dbType), null);
+
+        // assert
+        // var http = app.CreateClient();
+        // using var r = await http.GetAsync(await nQueueClient.Localhost($"api/NQueue/GetMessage"));
+        // r.EnsureSuccessStatusCode();
+        // (await r.Content.ReadAsStringAsync()).Should().Be($"");
+        fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+    }
+
+
+    
     private static async ValueTask ExecuteProcedure(DbConnection cnn, string procedure, params Func<DbCommand, DbParameter>[] ps)
     {
         await using var cmd = cnn.CreateCommand();

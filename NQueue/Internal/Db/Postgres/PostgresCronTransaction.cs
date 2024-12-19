@@ -38,7 +38,7 @@ namespace NQueue.Internal.Db.Postgres
             
             await ExecuteProcedure(
                 _tran, 
-                "nqueue.EnqueueWorkItem2",
+                "nqueue.EnqueueWorkItem",
                 SqlParameter(url.ToString()),
                 SqlParameter(queueName),
                 SqlParameter(shard),
