@@ -46,7 +46,7 @@ namespace NQueue.Internal.Workers
                         _tz);
                     if (next < DateTimeOffset.Now)
                     {
-                        logger.LogInformation($"Cron Job triggered: {cronJob.Name}");
+                        logger.LogDebug($"Cron Job triggered: {cronJob.Name}");
                         await ProcessCron(state, cronJob);
                     }
                 }
