@@ -148,9 +148,9 @@ namespace NQueue.Internal.Db.SqlServer
             return await _config.WithDbConnection(async cnn =>
             {
                 var rows = ExecuteReader(
-                    "SELECT q.Name, q.LockedUntil, q.Shard FROM NQueue.Queue q",
+                    "SELECT q.Name, q.LockedUntil, q.ExternalLockId, q.Shard FROM NQueue.Queue q",
                     cnn,
-                    reader => new QueueInfo(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetDateTime(1), reader.GetInt32(2)));
+                    reader => new QueueInfo(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetDateTime(1), reader.IsDBNull(2) ? null : reader.GetString(2), 0, reader.GetInt32(3)));
 
                 return await rows.ToListAsync();
             });

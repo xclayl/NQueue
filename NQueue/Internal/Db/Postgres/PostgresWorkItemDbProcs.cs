@@ -91,12 +91,11 @@ begin
 			wi.IsIngested = FALSE
 			AND wi.Shard = pShard
 	)
-	INSERT INTO NQueue.Queue (Name, NextWorkItemId, ErrorCount, LockedUntil, Shard, IsPaused, BlockedBy)
-	SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt, pShard, FALSE, ARRAY[]::nqueue.block[]
+	INSERT INTO NQueue.Queue (Name, NextWorkItemId, ErrorCount, LockedUntil, Shard, IsPaused, BlockedBy, ExternalLockId)
+	SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt, pShard, FALSE, ARRAY[]::nqueue.block[], NULL
 	FROM cte
 	WHERE RN = 1
 	ON CONFLICT (Shard, Name) DO NOTHING;
-
 
 	UPDATE NQueue.WorkItem wi
 	SET IsIngested = TRUE
@@ -121,8 +120,12 @@ begin
 		b.BlockingMessageId
 	LIMIT 1;
 
+
 	WHILE vBlockingMessageId IS NOT NULL LOOP
 		
+		IF vBlockingWorkItemId IS NULL OR vBlockingShard IS NULL THEN
+			RAISE EXCEPTION 'That''s weird. vBlockingWorkItemId and vBlockingShard shouldn''t be NULL here.';
+		END IF;
 
 		IF vBlockingIsCreatingBlock THEN
 			UPDATE NQueue.Queue q
@@ -134,7 +137,7 @@ begin
 			SET BlockedBy = array(
                 SELECT ((elem).WorkItemId, (elem).Shard)::nqueue.block
                 FROM unnest(q.BlockedBy) AS elem
-                WHERE (elem).WorkItemId <> vBlockingWorkItemId AND (elem).Shard <> vBlockingShard
+                WHERE NOT ((elem).WorkItemId = vBlockingWorkItemId AND (elem).Shard = vBlockingShard)
 			)
 			WHERE q.Shard = pShard 
 				AND q.Name = vBlockingQueueName;
@@ -172,6 +175,7 @@ begin
 		AND q.ErrorCount < 5
 		AND q.Shard = pShard
 		AND q.IsPaused = FALSE
+		AND q.ExternalLockId IS NULL
 		AND cardinality(q.BlockedBy) = 0
 		AND q.Name = pQueueName
 	ORDER BY
@@ -197,6 +201,8 @@ begin
 		FROM NQueue.WorkItem r
 		WHERE r.WorkItemId = vWorkItemID
 			AND r.Shard = pShard;
+
+
 
 end; $$ language plpgsql;
 ";
@@ -335,6 +341,45 @@ end; $$ language plpgsql;
                 );
                 
         }
+        
+        
+
+        public async ValueTask AcquireExternalLock(string queueName, string externalLockId)
+        {
+	        var shard = CalculateShard(queueName);
+	        
+	        await _config.WithDbConnection(async cnn =>
+	        {
+		        await ExecuteProcedure(
+			        "nqueue.AcquireExternalLock",
+			        cnn,
+			        SqlParameter(queueName),
+			        SqlParameter(shard),
+			        SqlParameter(externalLockId),
+			        SqlParameter(NowUtc)
+		        );
+	        });
+        }
+
+        public async ValueTask ReleaseExternalLock(string queueName, string externalLockId)
+        {
+	        var shard = CalculateShard(queueName);
+	        
+	        await _config.WithDbConnection(async cnn =>
+	        {
+		        await ExecuteProcedure(
+			        "nqueue.ReleaseExternalLock",
+			        cnn,
+			        SqlParameter(queueName),
+			        SqlParameter(shard),
+			        SqlParameter(externalLockId),
+			        SqlParameter(NowUtc)
+		        );
+	        });
+        }
+
+        
+        
         
         private int CalculateShard(string queueName)
         {

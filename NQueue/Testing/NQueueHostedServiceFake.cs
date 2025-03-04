@@ -82,6 +82,7 @@ namespace NQueue.Testing
 
         public Uri BaseAddress
         {
+            get => _config.LocalHttpAddresses.Select(u => new Uri(u)).First();
             set => _config.LocalHttpAddresses = new List<string> { value.AbsoluteUri };
         }
 
@@ -134,6 +135,8 @@ namespace NQueue.Testing
             
             var queues = await GetActiveQueues(queueNames, conn, queueHistory);
             
+            var hadActivity = false;
+            
             while (queues.Any())
             {
                 var queue = queues.First();
@@ -151,15 +154,21 @@ namespace NQueue.Testing
                 var found = await consumer.ExecuteOne(queue.queueName, false, _externalBaseUrls, _externalUrlCalls);
 
                 if (found)
+                {
                     await consumer.WaitUntilNoActivity();
-                
-                
-                
+                    hadActivity = true;
+                }
+
+
                 queues.RemoveAt(0);
 
                 if (!queues.Any())
                 {
+                    if (!hadActivity)
+                        break;
+                    
                     queues = await GetActiveQueues(queueNames, conn, queueHistory);
+                    hadActivity = false;
                 }
             }
         }
@@ -171,7 +180,7 @@ namespace NQueue.Testing
             var queues = await conn.GetQueuesForTesting();
             
             var lockedQueues = queues
-                .Where(q => q.LockedUntil != null && q.LockedUntil > now)
+                .Where(q => q.LockedUntil != null && q.LockedUntil > now || q.ExternalLockId != null)
                 .Select(q => q.QueueName)
                 .ToList();
             
@@ -295,14 +304,8 @@ namespace NQueue.Testing
         }
 
 
-        /// <summary>
-        /// I'm probably going to remove this.  Getting the list of workitems when testing is useful
-        /// for all DB backends.
-        /// For now, you can use this to access the Work Items created for verifying your tests.
-        /// </summary>
-        /// <returns></returns>
-        [Obsolete("Use GetWorkItems() instead")]
-        public async ValueTask<InMemoryDb?> GetInMemoryDb()
+
+        internal async ValueTask<InMemoryDb?> GetInMemoryDb()
         {
             var db = await _config.GetWorkItemDbConnection();
             return (await db.Get() as InMemoryWorkItemDbProcs)?.Db;

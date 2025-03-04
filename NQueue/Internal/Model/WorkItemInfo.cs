@@ -7,7 +7,7 @@ namespace NQueue.Internal.Model
 
     internal record WorkItemInfoWithQueueName(long WorkItemId, string Url, string QueueName, string? Internal, int Shard);
 
-    internal record QueueInfo(string QueueName, DateTimeOffset? LockedUntil, int Shard);
+    internal record QueueInfo(string QueueName, DateTimeOffset? LockedUntil, string? ExternalLockId, int BlockedByCount, int Shard);
 
 
     public readonly record struct WorkItem(
@@ -15,7 +15,8 @@ namespace NQueue.Internal.Model
         Uri Url,
         string QueueName,
         string? DebugInfo,
-        string? Internal)
+        string? Internal,
+        int FailCount)
     {
         internal static WorkItem From(WorkItemForTests wi)
         {
@@ -23,7 +24,8 @@ namespace NQueue.Internal.Model
                 wi.Url,
                 wi.QueueName,
                 wi.DebugInfo,
-                wi.Internal);
+                wi.Internal,
+                0);
         }
     }
     

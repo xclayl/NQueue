@@ -31,6 +31,8 @@ namespace NQueue.Internal.Db
         ValueTask DelayWorkItem(long workItemId, int shard, ILogger logger);
         ValueTask FailWorkItem(long workItemId, int shard, ILogger logger);
         ValueTask PurgeWorkItems(int shard);
+        ValueTask AcquireExternalLock(string queueName, string externalLockId);
+        ValueTask ReleaseExternalLock(string queueName, string externalLockId);
 
 
         ValueTask DeleteAllNQueueDataForUnitTests();

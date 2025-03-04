@@ -1,10 +1,9 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 
@@ -18,6 +17,10 @@ namespace NQueue.Sample.Controllers
         private readonly INQueueService _service;
         private readonly IServer _server;
         private static volatile string? _msg;
+
+        private readonly record struct MyStruct(string QueueName, string ResourceName);
+        
+        private static readonly ConcurrentDictionary<MyStruct, string> _lockIds = new();
 
         public NQueueController(INQueueClient client, INQueueService service, IServer server)
         {
@@ -90,6 +93,49 @@ namespace NQueue.Sample.Controllers
             return Ok("PollNow Done");
         }
 
+        
+
+        
+
+        [HttpGet]
+        public async ValueTask<string> GetLockId([FromQuery] string resourceName, [FromQuery] string queueName)
+        {
+            return _lockIds[new(queueName, resourceName)];
+        }
+        
+        [HttpGet]
+        public async ValueTask AcquireExternalLockAndDone([FromQuery] string resourceName, [FromQuery] string queueName)
+        {
+            await _client.AcquireExternalLock(resourceName, queueName, async (lockId) => _lockIds.TryAdd(new(queueName, resourceName), lockId));
+        }
+        [HttpGet]
+        public async ValueTask<IActionResult> AcquireExternalLockAndRunOnceMore([FromQuery] string resourceName, [FromQuery] string queueName)
+        {
+            if (!_lockIds.ContainsKey(new(queueName, resourceName)))
+            {
+                await _client.AcquireExternalLock(resourceName, queueName, async (lockId) => _lockIds.TryAdd(new(queueName, resourceName), lockId));
+                
+                return new StatusCodeResult(261); // re-run     
+            }
+            
+            return Ok(); // done 
+        }
+        [HttpGet]
+        public async ValueTask<IActionResult> AcquireExternalLockAndThrowException([FromQuery] string resourceName, [FromQuery] string queueName)
+        {
+            await _client.AcquireExternalLock(resourceName, queueName, async (lockId) => throw new Exception("An exception occured"));
+            
+            return Ok("AcquireExternalLock Done");
+        }
+        [HttpGet]
+        public async ValueTask<IActionResult> ReleaseExternalLock([FromQuery] string lockId)
+        {
+            await _client.ReleaseExternalLock(lockId);
+            
+            return Ok("ReleaseExternalLock Done");
+        }
+
+        [HttpGet]
         public async ValueTask<IActionResult> HealthCheck()
         {
             var h = await _service.HealthCheck();

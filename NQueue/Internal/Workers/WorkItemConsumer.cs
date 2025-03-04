@@ -21,7 +21,7 @@ namespace NQueue.Internal.Workers
         private readonly SemaphoreSlim _lock;
         private readonly int _maxQueueRunners;
         private long _currentQueueRunners = 0;
-        private readonly SpinWait _testingSpinWait = new();
+        // private readonly SpinWait _testingSpinWait = new();
         private readonly int _shard;
 
         public WorkItemConsumer(int maxQueueRunners, int shard, TimeSpan pollInterval, IWorkItemDbConnection workItemDbConnection,
@@ -180,7 +180,6 @@ namespace NQueue.Internal.Workers
             await Task.Delay(TimeSpan.FromMilliseconds(10));
             while (Interlocked.Read(ref _currentQueueRunners) > 0)
             {
-                _testingSpinWait.SpinOnce();
                 await Task.Delay(TimeSpan.FromMilliseconds(10));
             }
             await Task.Delay(TimeSpan.FromMilliseconds(10));

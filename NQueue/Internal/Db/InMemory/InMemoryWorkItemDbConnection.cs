@@ -63,9 +63,7 @@ namespace NQueue.Internal.Db.InMemory
 
         public async ValueTask<IReadOnlyList<QueueInfo>> GetQueuesForTesting()
         {
-            return (await _procs.Db.GetQueues())
-                .Select(q => new QueueInfo(q.QueueName, q.LockedUntil, 0))
-                .ToList();
+            return await _procs.Db.GetQueues();
         }
 
         public async IAsyncEnumerable<WorkItemForTests> GetCompletedWorkItemsForTests()

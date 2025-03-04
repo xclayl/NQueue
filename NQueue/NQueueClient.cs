@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
@@ -8,6 +9,12 @@ using NQueue.Internal;
 
 namespace NQueue
 {
+    
+    /// <summary>
+    /// Callback to provide the generated lockId so that you can trigger the callback to Release the lock.
+    /// </summary>
+    public delegate ValueTask TriggerExternalLock(string lockId);
+    
     /// <summary>
     /// Used for enqueuing Work items
     /// </summary>
@@ -42,6 +49,28 @@ namespace NQueue
         /// <param name="relativeUri"></param>
         /// <returns></returns>
         ValueTask<Uri> Localhost(string relativeUri);
+        
+        
+
+        /// <summary>
+        /// Locks a queue (preventing it from running) until ReleaseExternalLock(lockId) is called.
+        /// </summary>
+        /// <param name="resourceName">This acts like a 'key' to prevent double releasing the queue accidentally.
+        /// You can pass an empty string if this is not a concern.</param>
+        /// <param name="queueName">Name of the queue to lock.</param>
+        /// <param name="triggerExternalCallback">Code to trigger 3rd party processing where you want this queue to
+        /// wait until it is done.
+        /// NQueue will give a lockId to triggerExternalCallback.  The idea is you give this lock id
+        /// to the 3rd party, which will make an HTTP call to an endpoint you create that executes
+        /// ReleaseExternalLock(lockId).
+        /// The lockId is basically the queueName & resourceName concatenated.</param>
+        ValueTask AcquireExternalLock(string resourceName, string queueName, TriggerExternalLock triggerExternalCallback);
+        
+        /// <summary>
+        /// Releases the lock on a queue so that it can run again.  
+        /// </summary>
+        /// <param name="lockId">The lockId given to triggerExternalCallback</param>
+        ValueTask ReleaseExternalLock(string lockId);
     }
 
     internal class NQueueClient : INQueueClient
@@ -63,6 +92,60 @@ namespace NQueue
         {
             return Localhost(relativeUri, await _configFactory.GetConfig());
         }
+
+        public async ValueTask AcquireExternalLock(string resourceName, string queueName, TriggerExternalLock triggerExternalCallback)
+        {
+           
+            var config = await _configFactory.GetConfig();
+            var conn = await config.GetWorkItemDbConnection();
+            
+            var query = await conn.Get();
+
+            var externalLockId = BuildExternalLockId(resourceName, queueName);
+
+            await query.AcquireExternalLock(queueName, externalLockId);
+
+            try
+            {
+                await triggerExternalCallback(externalLockId);
+            }
+            catch
+            {
+                await query.ReleaseExternalLock(queueName, externalLockId);
+                throw;
+            }
+        }
+
+        private string BuildExternalLockId(string resourceName, string queueName)
+        {
+            return $"{queueName.Length}.{queueName}.{resourceName}";
+        }
+        private string ExtractQueueNameFromExternalLockId(string lockId)
+        {
+            var dotIndex = lockId.IndexOf('.');
+            if (dotIndex < 0)
+                throw new FormatException("Invalid external lock id format: " + lockId);
+            
+            var lenStr = lockId.Substring(0, dotIndex);
+            
+            if (!int.TryParse(lenStr, out var len))
+                throw new FormatException("Invalid external lock id format: " + lockId);
+            
+            return lockId.Substring(dotIndex + 1, len);
+        }
+
+        public async ValueTask ReleaseExternalLock(string lockId)
+        {
+            var config = await _configFactory.GetConfig();
+            var conn = await config.GetWorkItemDbConnection();
+            
+            var query = await conn.Get();
+
+            var queueName = ExtractQueueNameFromExternalLockId(lockId);
+            
+            await query.ReleaseExternalLock(queueName, lockId);
+        }
+
         internal static Uri Localhost(string relativeUri, NQueueServiceConfig config)
         {
             if (!config.LocalHttpAddresses.Any())

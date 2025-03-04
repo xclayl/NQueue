@@ -114,6 +114,15 @@ namespace NQueue.Internal.Db.SqlServer
             });
         }
 
+        public ValueTask AcquireExternalLock(string queueName, string externalLockId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public ValueTask ReleaseExternalLock(string queueName, string externalLockId)
+        {
+            throw new NotImplementedException();
+        }
 
 
         public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson, string? blockQueueName)

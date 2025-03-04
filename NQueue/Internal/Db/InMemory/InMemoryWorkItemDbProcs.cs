@@ -14,8 +14,11 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
     public readonly InMemoryDb Db = new();
 
     public ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo,
-        bool duplicateProtection, string? internalJson, string? blockQueueName) =>
-        Db.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicateProtection, internalJson, blockQueueName);
+        bool duplicateProtection, string? internalJson, string? blockQueueName)
+    {
+        queueName ??= Guid.NewGuid().ToString();
+        return Db.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicateProtection, internalJson, blockQueueName);
+    }
 
     public ValueTask<WorkItemInfo?> NextWorkItem(int shard) => Db.NextWorkItem();
     
@@ -28,6 +31,10 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
 
     public ValueTask PurgeWorkItems(int shard) => Db.PurgeWorkItems();
 
+    public ValueTask AcquireExternalLock(string queueName, string externalLockId) => Db.AcquireExternalLock(queueName, externalLockId);
+
+    public ValueTask ReleaseExternalLock(string queueName, string externalLockId) => Db.ReleaseExternalLock(queueName, externalLockId);
+
     public ValueTask DeleteAllNQueueDataForUnitTests() => Db.DeleteAllNQueueDataForUnitTests();
 
 
@@ -39,19 +46,35 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
 class CronWorkItemTran : ICronTransaction
 {
     private SemaphoreSlim _lock;
-    private readonly List<InMemoryDb.WorkItemForInMemory> _workItems;
+    private readonly InMemoryDb _inMemoryDb;
     private readonly List<CronJobInfo> _cronJobState;
     private readonly Func<long> _nextId;
-    
-    
-    private readonly List<InMemoryDb.WorkItemForInMemory> _tempWorkItems=new();
+
+
+
+    private readonly List<TempWorkItemForInMemory> _tempWorkItems = new();
     private readonly List<CronJobInfo> _tempCronJobState = new();
     private bool _lockAcquired;
 
-    public CronWorkItemTran(SemaphoreSlim @lock, List<InMemoryDb.WorkItemForInMemory> workItems, List<CronJobInfo> cronJobState, Func<long> nextId)
+    private record TempWorkItemForInMemory
+    {
+        public long WorkItemId { get; init; }
+        public Uri Url { get; init; }
+        public string QueueName { get; init; }
+        public string? DebugInfo { get; init; }
+        public bool IsIngested { get; init; }
+        public string? Internal { get; init; }
+        public bool DuplicateProtection { get; init; }
+        public int FailCount { get; init; } = 0;
+        public string? BlockQueueName { get; init; }
+    }
+    
+    
+    
+    public CronWorkItemTran(SemaphoreSlim @lock, InMemoryDb inMemoryDb, List<CronJobInfo> cronJobState, Func<long> nextId)
     {
         _lock = @lock;
-        _workItems = workItems;
+        _inMemoryDb = inMemoryDb;
         _cronJobState = cronJobState;
         _nextId = nextId;
     }
@@ -64,22 +87,14 @@ class CronWorkItemTran : ICronTransaction
         return ValueTask.CompletedTask;
     }
 
-    public ValueTask CommitAsync()
+    public async ValueTask CommitAsync()
     {
         if (!_lockAcquired)
             throw new Exception("In memory cron lock not acquired");
         
         foreach (var tempWorkItem in _tempWorkItems)
         {
-            if (!tempWorkItem.DuplicateProtection)
-                _workItems.Add(tempWorkItem);
-            else
-            {
-                var count = _workItems.Count(w => w.QueueName == tempWorkItem.QueueName
-                                                  && w.Url == tempWorkItem.Url);
-                if (count <= 1)
-                    _workItems.Add(tempWorkItem);
-            }
+            await _inMemoryDb.EnqueueWorkItem(null, tempWorkItem.Url, tempWorkItem.QueueName, tempWorkItem.DebugInfo, tempWorkItem.DuplicateProtection, tempWorkItem.Internal, null);
         }
 
         foreach (var tempCj in _tempCronJobState)
@@ -95,7 +110,6 @@ class CronWorkItemTran : ICronTransaction
         _tempCronJobState.Clear();
         _lock.Release();
         _lockAcquired = false;
-        return ValueTask.CompletedTask;
     }
 
     public ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection, string? blockQueueName)
@@ -105,13 +119,13 @@ class CronWorkItemTran : ICronTransaction
             throw new Exception("In memory cron lock not acquired");
         
         queueName ??= Guid.NewGuid().ToString();
-        _tempWorkItems.Add(new InMemoryDb.WorkItemForInMemory
+        _tempWorkItems.Add(new TempWorkItemForInMemory()
         {
             WorkItemId = _nextId(),
             DebugInfo = debugInfo,
             Url = url,
             QueueName = queueName,
-            DuplicateProtection = true,
+            DuplicateProtection = duplicateProtection,
             BlockQueueName = blockQueueName
         });
         return ValueTask.CompletedTask;
