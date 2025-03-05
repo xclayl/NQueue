@@ -144,6 +144,8 @@ namespace NQueue
             var queueName = ExtractQueueNameFromExternalLockId(lockId);
             
             await query.ReleaseExternalLock(queueName, lockId);
+            
+            _state?.PollNow();
         }
 
         internal static Uri Localhost(string relativeUri, NQueueServiceConfig config)
