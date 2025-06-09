@@ -17,7 +17,7 @@ namespace NQueue.Internal.Workers
     {
         private readonly NQueueServiceConfig _config;
         private readonly IWorkItemDbConnection _workItemDbConnection;
-        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly HttpClient _httpClient;
         private readonly SemaphoreSlim _lock;
         private readonly int _maxQueueRunners;
         private long _currentQueueRunners = 0;
@@ -25,7 +25,7 @@ namespace NQueue.Internal.Workers
         private readonly int _shard;
 
         public WorkItemConsumer(int maxQueueRunners, int shard, TimeSpan pollInterval, IWorkItemDbConnection workItemDbConnection,
-            IHttpClientFactory httpClientFactory, NQueueServiceConfig config, ILoggerFactory loggerFactory) : base(
+            HttpClient httpClient, NQueueServiceConfig config, ILoggerFactory loggerFactory) : base(
             pollInterval,
             typeof(WorkItemConsumer).FullName ?? "WorkItemConsumer",
             config.TimeZone,
@@ -34,10 +34,12 @@ namespace NQueue.Internal.Workers
         {
             _shard = shard;
             _workItemDbConnection = workItemDbConnection;
-            _httpClientFactory = httpClientFactory;
+            _httpClient = httpClient;
             _config = config;
             _lock = new SemaphoreSlim(maxQueueRunners, maxQueueRunners);
             _maxQueueRunners = maxQueueRunners;
+            
+            _httpClient.Timeout = TimeSpan.FromHours(1);
         }
 
 
@@ -131,14 +133,11 @@ namespace NQueue.Internal.Workers
                 // using var _ = StartWorkItemActivity(request);
                 try
                 {
-                    using var httpClient = _httpClientFactory.CreateClient();
-
-                    httpClient.Timeout = TimeSpan.FromHours(1);
                     using var httpReq = new HttpRequestMessage();
                     httpReq.RequestUri = new Uri(request.Url);
                     httpReq.Method = HttpMethod.Get;
                     await _config.ModifyHttpRequest(httpReq);
-                    using var resp = await httpClient.SendAsync(httpReq);
+                    using var resp = await _httpClient.SendAsync(httpReq);
 
                   
                     if (resp.StatusCode == HttpStatusCode.TooManyRequests || (int)resp.StatusCode == 261) // 261 is made up.  Here, it means "retry" - progress was made, but the Work Item is not complete yet

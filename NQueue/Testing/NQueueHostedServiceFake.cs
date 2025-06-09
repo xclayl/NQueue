@@ -147,7 +147,7 @@ namespace NQueue.Testing
                     queue.shard,
                     TimeSpan.Zero,
                     conn,
-                    new MyHttpClientFactory(client),
+                    client(),
                     _config,
                     loggerFactory);
 
@@ -224,7 +224,7 @@ namespace NQueue.Testing
                     shard,
                     TimeSpan.Zero,
                     conn,
-                    new MyHttpClientFactory(client),
+                    client(),
                     _config,
                     loggerFactory);
 
@@ -262,7 +262,7 @@ namespace NQueue.Testing
                     shard,
                     TimeSpan.Zero,
                     conn,
-                    new MyHttpClientFactory(client),
+                    client(),
                     _config,
                     loggerFactory);
 

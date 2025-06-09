@@ -13,19 +13,19 @@ namespace NQueue.Internal
     internal class InternalWorkItemBackgroundService
     {
         private readonly ConfigFactory _configFactory;
-        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly HttpClient _httpClient;
         private readonly ILogger<InternalWorkItemBackgroundService> _logger;
         private readonly ILoggerFactory _loggerFactory;
         private readonly IInternalWorkItemServiceState _serviceState;
 
         public InternalWorkItemBackgroundService(ILogger<InternalWorkItemBackgroundService> logger,
             ILoggerFactory loggerFactory, ConfigFactory configFactory, IServiceProvider serviceProvider,
-            IHttpClientFactory httpClientFactory, IInternalWorkItemServiceState serviceState)
+            HttpClient httpClient, IInternalWorkItemServiceState serviceState)
         {
             _logger = logger;
             _loggerFactory = loggerFactory;
             _configFactory = configFactory;
-            _httpClientFactory = httpClientFactory;
+            _httpClient = httpClient;
             _serviceState = serviceState;
         }
 
@@ -62,7 +62,7 @@ namespace NQueue.Internal
                         if (config.QueueRunners > 0)
                             Enumerable.Range(0, conn.ShardCount).ToList().ForEach(shard =>
                                 workers.Add(new WorkItemConsumer(config.QueueRunners, shard, config.PollInterval, conn,
-                                    _httpClientFactory, config, _loggerFactory))
+                                    _httpClient, config, _loggerFactory))
                             );
                         
 
