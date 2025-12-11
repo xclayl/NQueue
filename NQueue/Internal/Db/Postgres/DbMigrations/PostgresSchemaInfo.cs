@@ -792,4 +792,84 @@ internal record class PostgresSchemaInfo(string Type, string Name, string? DataT
        
         return IsVersion(actual, expected);
     }
+    
+    
+    
+    
+    private static IReadOnlyList<PostgresSchemaInfo> Version13 => new PostgresSchemaInfo[]
+    {
+        new("column", "CronJob.Active", Boolean),
+        new("column", "CronJob.CronJobName", CharacterVarying),
+        new("column", "CronJob.LastRanAt", TimestampWithTimeZone),
+        new("column", "Queue.ErrorCount", Integer),
+        new("column", "Queue.LockedUntil", TimestampWithTimeZone),
+        new("column", "Queue.Name", Text),
+        new("column", "Queue.NextWorkItemId", BigInt),
+        new("column", "Queue.QueueId", BigInt),
+        new("column", "Queue.Shard", Integer),
+        new("column", "Queue.IsPaused", Boolean),
+        new("column", "Queue.BlockedBy", Array),
+        new("column", "Queue.ExternalLockId", Text),
+        new("column", "WorkItem.CreatedAt", TimestampWithTimeZone),
+        new("column", "WorkItem.DebugInfo", Text),
+        new("column", "WorkItem.Internal", Jsonb),
+        new("column", "WorkItem.IsIngested", Boolean),
+        new("column", "WorkItem.LastAttemptedAt", TimestampWithTimeZone),
+        new("column", "WorkItem.QueueName", Text),
+        new("column", "WorkItem.Shard", Integer),
+        new("column", "WorkItem.Url", Text),
+        new("column", "WorkItem.WorkItemId", BigInt),
+        new("column", "WorkItem.BlockingQueueName", Text),
+        new("column", "WorkItem.BlockingQueueShard", Integer),
+        new("column", "WorkItemCompleted.CompletedAt", TimestampWithTimeZone),
+        new("column", "WorkItemCompleted.CreatedAt", TimestampWithTimeZone),
+        new("column", "WorkItemCompleted.DebugInfo", Text),
+        new("column", "WorkItemCompleted.Internal", Jsonb),
+        new("column", "WorkItemCompleted.LastAttemptedAt", TimestampWithTimeZone),
+        new("column", "WorkItemCompleted.QueueName", Text),
+        new("column", "WorkItemCompleted.Shard", Integer),
+        new("column", "WorkItemCompleted.Url", Text),
+        new("column", "WorkItemCompleted.WorkItemId", BigInt),
+        new("column", "WorkItemCompleted.BlockingQueueName", Text),
+        new("column", "WorkItemCompleted.BlockingQueueShard", Integer),
+        new("column", "BlockingMessage.QueueShard", Integer),
+        new("column", "BlockingMessage.BlockingMessageId", BigInt),
+        new("column", "BlockingMessage.QueueName", Text),
+        new("column", "BlockingMessage.IsCreatingBlock", Boolean),
+        new("column", "BlockingMessage.BlockingWorkItemId", BigInt),
+        new("column", "BlockingMessage.BlockingShard", Integer),
+        new("routine", "CompleteWorkItem"),
+        new("routine", "EnqueueWorkItem"),
+        new("routine", "FailWorkItem"),
+        new("routine", "DelayWorkItem"),
+        new("routine", "NextWorkItem"),
+        new("routine", "PurgeWorkItems"),
+        new("routine", "ReplayWorkItem"),
+        new("routine", "PauseQueue"),
+        new("routine", "AcquireExternalLock"),
+        new("routine", "ReleaseExternalLock"),
+        new("schema", "NQueue"),
+        new("table", "CronJob"),
+        new("table", "Queue"),
+        new("table", "WorkItem"),
+        new("table", "WorkItemCompleted"),
+        new("table", "BlockingMessage"),
+        new("index", "queue.pk_queue: CREATE UNIQUE INDEX pk_queue ON nqueue.queue USING btree (shard, queueid)"),
+        new("index", "workitem.pk_workitem: CREATE UNIQUE INDEX pk_workitem ON nqueue.workitem USING btree (shard, workitemid)"),
+        new("index", "workitemcompleted.pk_workitemcompleted: CREATE UNIQUE INDEX pk_workitemcompleted ON nqueue.workitemcompleted USING btree (shard, workitemid)"),
+        new("index", "cronjob.pk_cronjob: CREATE UNIQUE INDEX pk_cronjob ON nqueue.cronjob USING btree (cronjobname)"),
+        new("index", "queue.ak_queue_name: CREATE UNIQUE INDEX ak_queue_name ON nqueue.queue USING btree (shard, name)"),
+        new("index", "queue.ix_nqueue_queue_lockeduntil_nextworkitemid: CREATE UNIQUE INDEX ix_nqueue_queue_lockeduntil_nextworkitemid ON nqueue.queue USING btree (shard, lockeduntil, nextworkitemid, queueid) WHERE ((errorcount < 5) AND (ispaused = false) AND (externallockid IS NULL) AND (cardinality(blockedby) = 0))"),
+        new("index", "workitem.ix_nqueue_workitem_isingested_queuename: CREATE UNIQUE INDEX ix_nqueue_workitem_isingested_queuename ON nqueue.workitem USING btree (shard, isingested, queuename, workitemid) INCLUDE (createdat)"),
+        new("index", "workitemcompleted.ix_nqueue_workitemcompleted_completedat: CREATE UNIQUE INDEX ix_nqueue_workitemcompleted_completedat ON nqueue.workitemcompleted USING btree (shard, completedat, workitemid)"),
+        new("index", "blockingmessage.pk_blockingmessage: CREATE UNIQUE INDEX pk_blockingmessage ON nqueue.blockingmessage USING btree (queueshard, blockingmessageid)")
+
+        
+    };
+    public static bool IsVersion13(IReadOnlyList<PostgresSchemaInfo> actual)
+    {
+        var expected = Version13;
+       
+        return IsVersion(actual, expected);
+    }
 }
