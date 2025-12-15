@@ -110,7 +110,8 @@ end; $$");
                 }
                 else
                 {
-                    throw new Exception("The NQueue schema has an unknown structure.  One option is to move all tables & stored procedures to another schema so that NQueue can recreate them from scratch.");
+                    throw new Exception("The NQueue schema has an unknown structure.  One option is to move all tables & stored procedures to another schema so that NQueue can recreate them from scratch.  Found: \r\n" +
+                                        string.Join("\r\n", dbObjects.OrderBy(o => o.Type).ThenBy(o => o.Name).Select(o => $"{o.Type} {o.Name}: {o.DataType}")));
                 }
 
                 highestVersionDetected = Math.Max(highestVersionDetected, currentVersion);

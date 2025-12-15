@@ -39,6 +39,11 @@ internal record class PostgresSchemaInfo(string Type, string Name, string? DataT
             };
 
 
+        if (expectedTables.Length != actual.Count(a => a.Type.Equals("table", StringComparison.InvariantCultureIgnoreCase)))
+            return false;
+        if (expectedSps.Length != actual.Count(a => a.Type.Equals("routine", StringComparison.InvariantCultureIgnoreCase)))
+            return false;
+        
         if (expectedTables.Any(t => !actual.Any(d => d.Type.Equals("table", StringComparison.InvariantCultureIgnoreCase) && d.Name.Equals(t, StringComparison.InvariantCultureIgnoreCase))))
             return false;
         if (expectedSps.Any(r => !actual.Any(d => d.Type.Equals("routine", StringComparison.InvariantCultureIgnoreCase) && d.Name.Equals(r, StringComparison.InvariantCultureIgnoreCase))))
