@@ -346,7 +346,7 @@ end; $$
         ";
         
         
-        await AbstractWorkItemDb.ExecuteNonQuery(tran, sql);
+        await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, sql);
     }
     
     

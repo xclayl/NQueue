@@ -20,7 +20,7 @@ ON NQueue.WorkItemCompleted (Shard, CompletedAt, WorkItemId);
 
         
         
-        await AbstractWorkItemDb.ExecuteNonQuery(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
+        await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
         
     }
 }

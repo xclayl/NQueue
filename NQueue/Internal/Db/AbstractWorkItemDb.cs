@@ -56,6 +56,15 @@ namespace NQueue.Internal.Db
                 yield return row(reader);
         }
 
+        public static async ValueTask ExecuteNonQueryForMigration(DbTransaction tran, string sql, params Func<DbCommand, DbParameter>[] ps)
+        {
+            await using var cmd = tran.Connection!.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.Transaction = tran;
+            cmd.CommandTimeout = (int)TimeSpan.FromMinutes(20).TotalSeconds;
+            cmd.Parameters.AddRange(ps.Select(p => p(cmd)).ToArray());
+            await cmd.ExecuteNonQueryAsync();
+        }
         public static async ValueTask ExecuteNonQuery(DbTransaction tran, string sql, params Func<DbCommand, DbParameter>[] ps)
         {
             await using var cmd = tran.Connection!.CreateCommand();

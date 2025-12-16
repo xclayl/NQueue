@@ -40,7 +40,7 @@ public class PostgresDbUpgrader10
 
 
         ";
-        await AbstractWorkItemDb.ExecuteNonQuery(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
+        await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
 
 
         if (isCitus)
@@ -48,7 +48,7 @@ public class PostgresDbUpgrader10
 	        var distributeSql = @"
 SELECT create_distributed_table('nqueue.blockingmessage', 'queueshard', colocate_with => 'nqueue.workitem');
 ";
-	        await AbstractWorkItemDb.ExecuteNonQuery(tran, distributeSql);
+	        await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, distributeSql);
         }
         
         
@@ -725,7 +725,7 @@ end; $$;
         ";
         
         
-        await AbstractWorkItemDb.ExecuteNonQuery(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
+        await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
         
         
         

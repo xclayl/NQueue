@@ -21,7 +21,7 @@ public class PostgresDbUpgrader09
 			ON NQueue.Queue (Shard,LockedUntil,NextWorkItemId,QueueId)
 			INCLUDE (ErrorCount, IsPaused);
         ";
-	    await AbstractWorkItemDb.ExecuteNonQuery(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
+	    await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
 
 
         
@@ -565,7 +565,7 @@ end; $$;
         ";
         
         
-        await AbstractWorkItemDb.ExecuteNonQuery(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
+        await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
         
     }
     

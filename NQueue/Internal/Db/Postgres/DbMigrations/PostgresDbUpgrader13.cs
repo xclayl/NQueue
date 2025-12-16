@@ -24,7 +24,7 @@ public class PostgresDbUpgrader13
 			    AND ExternalLockId IS NULL
 			    AND cardinality(BlockedBy) = 0;
         ";
-		await AbstractWorkItemDb.ExecuteNonQuery(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
+		await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
 
 
 

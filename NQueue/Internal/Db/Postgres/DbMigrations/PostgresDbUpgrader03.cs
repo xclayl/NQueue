@@ -450,7 +450,7 @@ end; $$
         ";
         
         
-        await AbstractWorkItemDb.ExecuteNonQuery(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
+        await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
 
      
 	    if (isCitus)
@@ -461,7 +461,7 @@ SELECT create_distributed_table('nqueue.queue', 'shard', colocate_with => 'nqueu
 SELECT create_distributed_table('nqueue.workitemcompleted', 'shard', colocate_with => 'nqueue.workitem');
 SELECT create_distributed_table('nqueue.cronjob', 'cronjobname');
 ";
-		    await AbstractWorkItemDb.ExecuteNonQuery(tran, distributeSql);
+		    await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, distributeSql);
 	    }
     }
 }

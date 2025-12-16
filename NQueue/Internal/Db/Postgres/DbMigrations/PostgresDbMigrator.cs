@@ -13,7 +13,7 @@ namespace NQueue.Internal.Db.Postgres.DbMigrations
         {
             
             await using var tran = await conn.BeginTransactionAsync();
-            await AbstractWorkItemDb.ExecuteNonQuery(tran, @"do $$ BEGIN 
+            await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, @"do $$ BEGIN 
 PERFORM pg_advisory_xact_lock(-5839653868952364629);
 end; $$");
             

@@ -18,7 +18,7 @@ public class PostgresDbUpgrader06
 SELECT undistribute_table('nqueue.workitem', cascade_via_foreign_keys:=true);
 SELECT undistribute_table('nqueue.workitemcompleted', cascade_via_foreign_keys:=true);
 ";
-	        await AbstractWorkItemDb.ExecuteNonQuery(tran, distributeSql);
+	        await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, distributeSql);
         }
         
         
@@ -564,7 +564,7 @@ end; $$;
         ";
         
         
-        await AbstractWorkItemDb.ExecuteNonQuery(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
+        await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
         
         
            
@@ -575,7 +575,7 @@ SELECT create_distributed_table('nqueue.workitem', 'shard');
 SELECT create_distributed_table('nqueue.queue', 'shard', colocate_with => 'nqueue.workitem');
 SELECT create_distributed_table('nqueue.workitemcompleted', 'shard', colocate_with => 'nqueue.workitem');
 ";
-	        await AbstractWorkItemDb.ExecuteNonQuery(tran, distributeSql);
+	        await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, distributeSql);
         }
     }
 }
