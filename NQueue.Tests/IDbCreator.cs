@@ -8,5 +8,6 @@ namespace NQueue.Tests;
 internal interface IDbCreator : IAsyncDisposable
 {
     ValueTask<DbConnection?> CreateConnection();
-    ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection();
+    ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection(ShardConfig? shardConfig = null);
+    ShardConfig DefaultShardConfig { get; }
 }

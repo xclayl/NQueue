@@ -23,7 +23,7 @@ end; $$");
             var attempts = 0;
             var highestVersionDetected = 0;
 
-            while (currentVersion != 13)
+            while (currentVersion != 14)
             {
                 attempts++;
                 if (attempts > 100)
@@ -55,6 +55,10 @@ end; $$");
                     // version "0" DB. Upgrade to version 1
 
                     currentVersion = 0;
+                }
+                else if (PostgresSchemaInfo.IsVersion14(dbObjects))
+                {
+                    currentVersion = 14;
                 }
                 else if (PostgresSchemaInfo.IsVersion13(dbObjects))
                 {
@@ -167,6 +171,10 @@ end; $$");
                 if (currentVersion == 12)
                 {
                     await new PostgresDbUpgrader13().Upgrade(tran, isCitus);
+                }
+                if (currentVersion == 13)
+                {
+                    await new PostgresDbUpgrader14().Upgrade(tran, isCitus);
                 }
             }
 

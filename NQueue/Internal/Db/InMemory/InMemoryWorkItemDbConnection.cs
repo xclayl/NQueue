@@ -51,7 +51,7 @@ namespace NQueue.Internal.Db.InMemory
             return (count == 0, count);
         }
 
-        public int ShardCount => 1;
+        public ShardConfig ShardConfig { get; } = new(1);
         public IReadOnlyList<int> GetShardOrderForTesting() => new[] { 0 };
         public async IAsyncEnumerable<WorkItemForTests> GetWorkItemsForTests()
         {

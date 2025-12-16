@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Data.Common;
+using System.IO.Hashing;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -13,7 +14,7 @@ namespace NQueue.Internal.Db.Postgres
     {
         private readonly IDbConfig _config;
     
-        public PostgresWorkItemDbProcs(IDbConfig config, bool isCitus): base(config.TimeZone, isCitus)
+        public PostgresWorkItemDbProcs(IDbConfig config, ShardConfig shardConfig): base(config.TimeZone, shardConfig)
         {
             _config = config;
         }
@@ -24,7 +25,7 @@ namespace NQueue.Internal.Db.Postgres
         {
             return await _config.WithDbConnection(async cnn =>
             {
-                var rows = ExecuteReader("SELECT * FROM nqueue.NextWorkItem($1, $2)",
+                var rows = ExecuteReader("SELECT * FROM nqueue.NextWorkItem($1, $2, $3)",
                     cnn,
                     reader => new WorkItemInfo(
                         reader.GetInt64(reader.GetOrdinal("WorkItemId")),
@@ -34,6 +35,7 @@ namespace NQueue.Internal.Db.Postgres
                             : null
                     ),
                     SqlParameter(shard),
+                    SqlParameter(ShardConfig.ConsumingShardCount),
                     SqlParameter(NowUtc)
                 );
 
@@ -52,6 +54,7 @@ namespace NQueue.Internal.Db.Postgres
 	        var sql = @"
 CREATE FUNCTION pg_temp.TestingNextWorkItem (
 	pShard NQueue.WorkItem.Shard%TYPE,
+	pMaxShards NQueue.WorkItem.MaxShards%TYPE,
 	pQueueName NQueue.WorkItem.QueueName%TYPE,
     pNow timestamp with time zone = NULL
 ) RETURNS TABLE(WorkItemId NQueue.WorkItem.WorkItemID%TYPE, Url NQueue.WorkItem.Url%TYPE, Internal NQueue.WorkItem.Internal%TYPE)
@@ -64,11 +67,14 @@ declare
 	vBlockingIsCreatingBlock NQueue.BlockingMessage.IsCreatingBlock%TYPE;
 	vBlockingWorkItemId NQueue.BlockingMessage.BlockingWorkItemId%TYPE;
 	vBlockingShard NQueue.BlockingMessage.BlockingShard%TYPE;
-
 begin
 
 	IF pNow IS NULL THEN
 		pNow := CURRENT_TIMESTAMP;
+	END IF;
+
+	IF pShard >= pMaxShards OR pShard < 0 THEN
+		RAISE EXCEPTION 'pShard must be between 0 and pMaxShards - 1, inclusive';
 	END IF;
 
 	-- SET NOCOUNT ON added to prevent extra result sets from
@@ -90,12 +96,13 @@ begin
 		WHERE
 			wi.IsIngested = FALSE
 			AND wi.Shard = pShard
+			AND wi.MaxShards = pMaxShards
 	)
-	INSERT INTO NQueue.Queue (Name, NextWorkItemId, ErrorCount, LockedUntil, Shard, IsPaused, BlockedBy, ExternalLockId)
-	SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt, pShard, FALSE, ARRAY[]::nqueue.block[], NULL
+	INSERT INTO NQueue.Queue (Name, NextWorkItemId, ErrorCount, LockedUntil, Shard, MaxShards, IsPaused, BlockedBy, ExternalLockId)
+	SELECT cte.QueueName, cte.WorkItemId, 0, cte.CreatedAt, pShard, pMaxShards, FALSE, ARRAY[]::nqueue.block[], NULL
 	FROM cte
 	WHERE RN = 1
-	ON CONFLICT (Shard, Name) DO NOTHING;
+	ON CONFLICT (Shard, MaxShards, Name) DO NOTHING;
 
 	UPDATE NQueue.WorkItem wi
 	SET IsIngested = TRUE
@@ -104,7 +111,9 @@ begin
 	WHERE wi.QueueName = q.Name
 		AND wi.IsIngested = FALSE
 		AND wi.Shard = pShard
-		AND wi.Shard = q.Shard;
+		AND wi.MaxShards = pMaxShards
+		AND wi.Shard = q.Shard
+		AND q.MaxShards = pMaxShards;
 
 
 	--------- process blocking messages ---------
@@ -116,6 +125,7 @@ begin
 		NQueue.BlockingMessage b
 	WHERE
 		b.QueueShard = pShard
+		AND b.QueueMaxShards = pMaxShards
 	ORDER BY
 		b.BlockingMessageId
 	LIMIT 1;
@@ -131,6 +141,7 @@ begin
 			UPDATE NQueue.Queue q
 			SET BlockedBy = BlockedBy || (vBlockingWorkItemId, vBlockingShard)::nqueue.block
 			WHERE q.Shard = pShard 
+				AND q.MaxShards = pMaxShards
 				AND q.Name = vBlockingQueueName;
 		ELSE
 			UPDATE NQueue.Queue q
@@ -140,20 +151,22 @@ begin
                 WHERE NOT ((elem).WorkItemId = vBlockingWorkItemId AND (elem).Shard = vBlockingShard)
 			)
 			WHERE q.Shard = pShard 
+				AND q.MaxShards = pMaxShards
 				AND q.Name = vBlockingQueueName;
 		END IF; 		
 
 
 
-		DELETE FROM NQueue.BlockingMessage b WHERE b.QueueShard = pShard AND b.BlockingMessageId = vBlockingMessageId;
+		DELETE FROM NQueue.BlockingMessage b WHERE b.QueueShard = pShard AND b.QueueMaxShards = pMaxShards AND b.BlockingMessageId = vBlockingMessageId;
 
 
 		SELECT b.BlockingMessageId, b.QueueName, b.IsCreatingBlock, b.BlockingWorkItemId, b.BlockingShard
-		INTO   vBlockingMessageId,  vBlockingQueueName, vBlockingIsCreatingBlock, vBlockingWorkItemId, vBlockingShard
+		INTO   vBlockingMessageId, vBlockingQueueName, vBlockingIsCreatingBlock, vBlockingWorkItemId, vBlockingShard
 		FROM
 			NQueue.BlockingMessage b
 		WHERE
 			b.QueueShard = pShard
+			AND b.QueueMaxShards = pMaxShards
 		ORDER BY
 			b.BlockingMessageId
 		LIMIT 1;
@@ -174,6 +187,7 @@ begin
 		q.LockedUntil < pNow
 		AND q.ErrorCount < 5
 		AND q.Shard = pShard
+		AND q.MaxShards = pMaxShards
 		AND q.IsPaused = FALSE
 		AND q.ExternalLockId IS NULL
 		AND cardinality(q.BlockedBy) = 0
@@ -188,20 +202,22 @@ begin
 		UPDATE NQueue.WorkItem ur
 		SET LastAttemptedAt = pNow
 		WHERE ur.WorkItemId = vWorkItemID
-			AND ur.Shard = pShard;
+			AND ur.Shard = pShard
+			AND ur.MaxShards = pMaxShards;
 
 		UPDATE NQueue.Queue ur
 		SET LockedUntil = pNow + interval '1 hour'
 		WHERE ur.QueueId = vQueueID
-			AND ur.Shard = pShard;
+			AND ur.Shard = pShard
+			AND ur.MaxShards = pMaxShards;
 	END IF;
 
 	return query
 	SELECT r.WorkItemId, r.Url, r.Internal
 		FROM NQueue.WorkItem r
 		WHERE r.WorkItemId = vWorkItemID
-			AND r.Shard = pShard;
-
+			AND r.Shard = pShard
+			AnD r.MaxShards = pMaxShards;
 
 
 end; $$ language plpgsql;
@@ -210,7 +226,7 @@ end; $$ language plpgsql;
 	        {
 		        await ExecuteNonQuery(sql, cnn);
 
-		        var rows = ExecuteReader("SELECT * FROM pg_temp.TestingNextWorkItem($1, $2, $3)",
+		        var rows = ExecuteReader("SELECT * FROM pg_temp.TestingNextWorkItem($1, $2, $3, $4)",
 			        cnn,
 			        reader => new WorkItemInfo(
 				        reader.GetInt64(reader.GetOrdinal("WorkItemId")),
@@ -220,6 +236,7 @@ end; $$ language plpgsql;
 					        : null
 			        ),
 			        SqlParameter(shard),
+			        SqlParameter(ShardConfig.ConsumingShardCount),
 			        SqlParameter(queueName),
 			        SqlParameter(NowUtc)
 		        );
@@ -241,6 +258,7 @@ end; $$ language plpgsql;
                     cnn,
                     SqlParameter(workItemId),
                     SqlParameter(shard),
+                    SqlParameter(ShardConfig.ConsumingShardCount),
                     SqlParameter(NowUtc)
                 );
             }, logger);
@@ -255,6 +273,7 @@ end; $$ language plpgsql;
                     cnn,
                     SqlParameter(workItemId),
                     SqlParameter(shard),
+                    SqlParameter(ShardConfig.ConsumingShardCount),
                     SqlParameter(NowUtc)
                 );
             }, logger);
@@ -269,6 +288,7 @@ end; $$ language plpgsql;
                     cnn,
                     SqlParameter(workItemId),
                     SqlParameter(shard),
+                    SqlParameter(ShardConfig.ConsumingShardCount),
                     SqlParameter(NowUtc)
                 );
             }, logger);
@@ -291,6 +311,7 @@ end; $$ language plpgsql;
                     "nqueue.PurgeWorkItems",
                     cnn,
                     SqlParameter(shard),
+                    SqlParameter(ShardConfig.ConsumingShardCount),
                     SqlParameter(NowUtc)
                 );
             });
@@ -303,7 +324,13 @@ end; $$ language plpgsql;
 	        
 	        queueName ??= Guid.NewGuid().ToString();
             
-	        var shard = CalculateShard(queueName);
+	        // if we're blocking, the new work item must be on the same shard scheme.
+	        // The assumption is that the queue to block is currently running, so it's on
+	        // the Consuming shard scheme.
+	        // It doesn't make sense to block a random queue, b/c you don't know if it is running. (assumptions again)
+	        var maxShards = blockQueueName != null ? ShardConfig.ConsumingShardCount : ShardConfig.ProducingShardCount;
+	        
+	        var shard = CalculateShard(queueName, maxShards);
 
 	        
             if (tran == null)
@@ -316,11 +343,12 @@ end; $$ language plpgsql;
                         SqlParameter(url.ToString()),
                         SqlParameter(queueName),
                         SqlParameter(shard),
+                        SqlParameter(maxShards),
                         SqlParameter(debugInfo),
                         SqlParameter(NowUtc),
                         SqlParameter(duplicateProtection),
                         SqlParameter(internalJson), 
-                        SqlParameter(blockQueueName != null ? CalculateShard(blockQueueName) : null),
+                        SqlParameter(blockQueueName != null ? CalculateShard(blockQueueName, maxShards) : null),
                         SqlParameter(blockQueueName)
                     );
                 });
@@ -332,11 +360,12 @@ end; $$ language plpgsql;
                     SqlParameter(url.ToString()),
                     SqlParameter(queueName),
                     SqlParameter(shard),
+                    SqlParameter(maxShards),
                     SqlParameter(debugInfo),
                     SqlParameter(NowUtc),
                     SqlParameter(duplicateProtection),
                     SqlParameter(internalJson), 
-                    SqlParameter(blockQueueName != null ? CalculateShard(blockQueueName) : null),
+                    SqlParameter(blockQueueName != null ? CalculateShard(blockQueueName, maxShards) : null),
                     SqlParameter(blockQueueName)
                 );
                 
@@ -344,9 +373,9 @@ end; $$ language plpgsql;
         
         
 
-        public async ValueTask AcquireExternalLock(string queueName, string externalLockId)
+        public async ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId)
         {
-	        var shard = CalculateShard(queueName);
+	        var shard = CalculateShard(queueName, maxShards); 
 	        
 	        await _config.WithDbConnection(async cnn =>
 	        {
@@ -355,15 +384,17 @@ end; $$ language plpgsql;
 			        cnn,
 			        SqlParameter(queueName),
 			        SqlParameter(shard),
+			        SqlParameter(maxShards),
 			        SqlParameter(externalLockId),
 			        SqlParameter(NowUtc)
 		        );
 	        });
         }
 
-        public async ValueTask ReleaseExternalLock(string queueName, string externalLockId)
+        public async ValueTask ReleaseExternalLock(string queueName, int maxShards, string externalLockId)
         {
-	        var shard = CalculateShard(queueName);
+	      
+	        var shard = CalculateShard(queueName, maxShards);
 	        
 	        await _config.WithDbConnection(async cnn =>
 	        {
@@ -372,6 +403,7 @@ end; $$ language plpgsql;
 			        cnn,
 			        SqlParameter(queueName),
 			        SqlParameter(shard),
+			        SqlParameter(maxShards),
 			        SqlParameter(externalLockId),
 			        SqlParameter(NowUtc)
 		        );
@@ -381,17 +413,22 @@ end; $$ language plpgsql;
         
         
         
-        private int CalculateShard(string queueName)
+        private int CalculateShard(string queueName, int maxShards)
         {
-	        if (!IsCitus)
+	        if (maxShards == 1)
 		        return 0;
             
-	        using var md5 = MD5.Create();
-	        var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(queueName));
+	        if (maxShards == 16) // backwards compatible
+	        {
+		        using var md5 = MD5.Create();
+		        var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(queueName));
 
-	        var shard = bytes[0] >> 4 & 15;
+		        return bytes[0] >> 4 & 15; 
+	        }
 
-	        return shard;
+	        var xxHash = new XxHash32();
+	        xxHash.Append(Encoding.UTF8.GetBytes(queueName));
+	        return GetShard(xxHash.GetCurrentHash(), maxShards);
         }
 
         public async ValueTask DeleteAllNQueueDataForUnitTests()

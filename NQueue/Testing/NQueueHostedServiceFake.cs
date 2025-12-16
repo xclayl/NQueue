@@ -17,6 +17,7 @@ namespace NQueue.Testing
     /// <summary>
     /// Instead of enabling background processing during tests, you can use this to control
     /// when background activity occurs.
+    /// This will use 1 shard by default.
     /// </summary>
     public class NQueueHostedServiceFake
     {
@@ -29,12 +30,13 @@ namespace NQueue.Testing
         {
         }
         
-        public NQueueHostedServiceFake(Func<ValueTask<DbConnection?>> cnnBuilder, Uri? baseUri = null)
+        public NQueueHostedServiceFake(Func<ValueTask<DbConnection?>> cnnBuilder, Uri? baseUri = null, ShardConfig? shardConfig = null)
         {
             var fakeDbLock = new FakeDbConnectionLock();
             _config = new NQueueServiceConfig(fakeDbLock)
             {
-                CreateDbConnection = cnnBuilder
+                CreateDbConnection = cnnBuilder,
+                ShardConfig = shardConfig ?? new(1)
             };
             if (baseUri != null)
                 _config.LocalHttpAddresses = new[] { baseUri.AbsoluteUri };
@@ -44,6 +46,8 @@ namespace NQueue.Testing
             _service = new NQueueServiceFake(configFactory);
 
         }
+
+        public NQueueServiceConfig Config => _config; 
 
         private class FakeDbConnectionLock : IDbConnectionLock
         {

@@ -25,15 +25,17 @@ internal class PostgresDbCreator : IDbCreator
 
     
 
-    public async ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection()
+    public async ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection(ShardConfig? shardConfig = null)
     {
         await EnsureDbCreated();
         return new PostgresWorkItemDbConnection(new PostgresDbConfig
         {
             TimeZone = TimeZoneInfo.Local,
             Cnn = UserConnectionString("nqueue_test")
-        }, false);
+        }, false, shardConfig ?? DefaultShardConfig);
     }
+
+    public ShardConfig DefaultShardConfig => new (1);
 
     private string OwnerConnectionString(string db) =>
         $"User ID=postgres;Password={Password};Host=localhost;Port={_postgreSqlContainer.GetMappedPublicPort(5432)};Database={db}";

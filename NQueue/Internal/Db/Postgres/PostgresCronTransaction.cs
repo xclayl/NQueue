@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Data.Common;
+using System.IO.Hashing;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,7 +13,7 @@ namespace NQueue.Internal.Db.Postgres
         private readonly DbTransaction _tran;
         private readonly DbConnection _conn;
 
-        public PostgresCronTransaction(DbTransaction tran, DbConnection conn, TimeZoneInfo tz, bool isCitus): base(tz, isCitus)
+        public PostgresCronTransaction(DbTransaction tran, DbConnection conn, TimeZoneInfo tz, ShardConfig shardConfig): base(tz, shardConfig)
         {
             _tran = tran;
             _conn = conn;
@@ -30,11 +31,11 @@ namespace NQueue.Internal.Db.Postgres
             await _tran.CommitAsync();
         }
 
-        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection, string? blockQueueName)
+        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
         {
             queueName ??= Guid.NewGuid().ToString();
             
-            var shard = CalculateShard(queueName);
+            var shard = CalculateShard(queueName, ShardConfig.ProducingShardCount);
             
             await ExecuteProcedure(
                 _tran, 
@@ -42,26 +43,32 @@ namespace NQueue.Internal.Db.Postgres
                 SqlParameter(url.ToString()),
                 SqlParameter(queueName),
                 SqlParameter(shard),
+                SqlParameter(ShardConfig.ProducingShardCount),
                 SqlParameter(debugInfo),
                 SqlParameter(NowUtc),
                 SqlParameter(duplicateProtection),
                 SqlParameter((string?)null), 
-                SqlParameter(blockQueueName != null ? CalculateShard(blockQueueName) : null),
-                SqlParameter(blockQueueName)
+                SqlParameter((int?)null),
+                SqlParameter((string?)null)
             );
         }
 
-        private int CalculateShard(string queueName)
+        private int CalculateShard(string queueName, int maxShards)
         {
-            if (!IsCitus)
+            if (maxShards == 1)
                 return 0;
-            
-            using var md5 = MD5.Create();
-            var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(queueName));
 
-            var shard = bytes[0] >> 4 & 15;
+            if (maxShards == 16) // backwards compatible
+            {
+                using var md5 = MD5.Create();
+                var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(queueName));
 
-            return shard;
+                return bytes[0] >> 4 & 15; 
+            }
+
+            var xxHash = new XxHash32();
+            xxHash.Append(Encoding.UTF8.GetBytes(queueName));
+            return GetShard(xxHash.GetCurrentHash(), maxShards);
         }
 
 

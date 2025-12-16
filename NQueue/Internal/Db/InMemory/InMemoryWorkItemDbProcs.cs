@@ -31,9 +31,9 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
 
     public ValueTask PurgeWorkItems(int shard) => Db.PurgeWorkItems();
 
-    public ValueTask AcquireExternalLock(string queueName, string externalLockId) => Db.AcquireExternalLock(queueName, externalLockId);
+    public ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId) => Db.AcquireExternalLock(queueName, externalLockId);
 
-    public ValueTask ReleaseExternalLock(string queueName, string externalLockId) => Db.ReleaseExternalLock(queueName, externalLockId);
+    public ValueTask ReleaseExternalLock(string queueName, int maxShards, string externalLockId) => Db.ReleaseExternalLock(queueName, externalLockId);
 
     public ValueTask DeleteAllNQueueDataForUnitTests() => Db.DeleteAllNQueueDataForUnitTests();
 
@@ -112,7 +112,7 @@ class CronWorkItemTran : ICronTransaction
         _lockAcquired = false;
     }
 
-    public ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection, string? blockQueueName)
+    public ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
     {
         
         if (!_lockAcquired)
@@ -126,7 +126,7 @@ class CronWorkItemTran : ICronTransaction
             Url = url,
             QueueName = queueName,
             DuplicateProtection = duplicateProtection,
-            BlockQueueName = blockQueueName
+            BlockQueueName = null
         });
         return ValueTask.CompletedTask;
     }

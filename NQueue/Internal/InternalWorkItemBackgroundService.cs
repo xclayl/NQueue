@@ -60,7 +60,7 @@ namespace NQueue.Internal
                         using var workers = new DisposableList<IWorker>();
 
                         if (config.QueueRunners > 0)
-                            Enumerable.Range(0, conn.ShardCount).ToList().ForEach(shard =>
+                            Enumerable.Range(0, conn.ShardConfig.ConsumingShardCount).ToList().ForEach(shard =>
                                 workers.Add(new WorkItemConsumer(config.QueueRunners, shard, config.PollInterval, conn,
                                     _httpClient, config, _loggerFactory))
                             );

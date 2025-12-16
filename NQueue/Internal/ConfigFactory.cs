@@ -51,11 +51,13 @@ namespace NQueue.Internal
                 if (_config == null)
                 {
                     _config = new NQueueServiceConfig(_dbLock);
+                    
                     await _configBuilder!(_serviceProvider!, _config);
 
                     AssertNoDuplicateCronJobNames(_config.CronJobs);
                     AssertValidUrls(_config.CronJobs);
                     AssertValidCronSpecs(_config.CronJobs);
+                    AssertValidShards(_config.ShardConfig);
                 }
 
                 return _config;
@@ -64,6 +66,14 @@ namespace NQueue.Internal
             {
                 _initLock.Release();
             }
+        }
+
+        private void AssertValidShards(ShardConfig shardConfig)
+        {
+            if (shardConfig.ConsumingShardCount < 1)
+                throw new Exception($"ConsumingShardCount must be > 0.  Found {shardConfig.ConsumingShardCount}");
+            if (shardConfig.ProducingShardCount < 1)
+                throw new Exception($"ProducingShardCount must be > 0.  Found {shardConfig.ProducingShardCount}");
         }
 
         private static void AssertValidCronSpecs(IReadOnlyList<NQueueCronJob> cronJobs)

@@ -26,7 +26,7 @@ internal class SqlServerDbCreator : IDbCreator
         .Build();
 
     
-    public async ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection()
+    public async ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection(ShardConfig? shardConfig = null)
     {
         await EnsureDbCreated();
         return new SqlServerWorkItemDbConnection(new SqlServerDbConfig
@@ -41,6 +41,8 @@ internal class SqlServerDbCreator : IDbCreator
     private string UserConnectionString(string user) =>
         $"User ID=NQueueUser;Password={Password};Data Source=localhost,{_postgreSqlContainer.GetMappedPublicPort(1433)};Database=nqueue_test;TrustServerCertificate=True";
 
+    
+    public ShardConfig DefaultShardConfig => new(1);
     
     private async ValueTask ExecuteNonQuery(string sql, string? db = null)
     {

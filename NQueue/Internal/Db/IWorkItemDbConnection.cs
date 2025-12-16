@@ -14,7 +14,7 @@ namespace NQueue.Internal.Db
         ValueTask<T> AsTran<T>(Func<ICronTransaction, ValueTask<T>> action);
         ValueTask<(bool healthy, int countUnhealthy)> QueueHealthCheck();
         ValueTask<IReadOnlyList<CronJobInfo>> GetCronJobState();
-        int ShardCount { get; }
+        ShardConfig ShardConfig { get; }
 
         IReadOnlyList<int> GetShardOrderForTesting();
         IAsyncEnumerable<WorkItemForTests> GetWorkItemsForTests();
@@ -31,8 +31,8 @@ namespace NQueue.Internal.Db
         ValueTask DelayWorkItem(long workItemId, int shard, ILogger logger);
         ValueTask FailWorkItem(long workItemId, int shard, ILogger logger);
         ValueTask PurgeWorkItems(int shard);
-        ValueTask AcquireExternalLock(string queueName, string externalLockId);
-        ValueTask ReleaseExternalLock(string queueName, string externalLockId);
+        ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId);
+        ValueTask ReleaseExternalLock(string queueName, int maxShards, string externalLockId);
 
 
         ValueTask DeleteAllNQueueDataForUnitTests();
@@ -41,7 +41,7 @@ namespace NQueue.Internal.Db
     internal interface ICronTransaction : IAsyncDisposable
     {
         ValueTask CommitAsync();
-        ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection, string? blockQueueName);
+        ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection);
         ValueTask CreateCronJob(string name);
         ValueTask<(DateTimeOffset lastRan, bool active)> SelectAndLockCronJob(string cronJobName);
         ValueTask UpdateCronJobLastRanAt(string cronJobName);

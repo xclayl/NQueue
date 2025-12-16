@@ -13,19 +13,21 @@ namespace NQueue.Internal.Db.Postgres
         private readonly IDbConfig _config;
         private readonly SemaphoreSlim _lock = new(1, 1);
         private volatile bool _dbMigrationRan;
+        private readonly bool _isCitus;
 
         private static IReadOnlyList<int>? RotatingShardOrderForTests = null;
     
-        public PostgresWorkItemDbConnection(IDbConfig config, bool isCitus): base(config.TimeZone, isCitus)
+        public PostgresWorkItemDbConnection(IDbConfig config, bool isCitus, ShardConfig shardConfig): base(config.TimeZone, shardConfig)
         {
             _config = config;
+            _isCitus = isCitus;
         }
     
     
         public async ValueTask<IWorkItemDbProcs> Get()
         {
             await EnsureDbMigrationRuns();
-            return new PostgresWorkItemDbProcs(_config, IsCitus);
+            return new PostgresWorkItemDbProcs(_config, ShardConfig);
         }
 
 
@@ -45,7 +47,7 @@ namespace NQueue.Internal.Db.Postgres
             return await _config.WithDbConnection(async conn =>
             {
                 await using var dbTran = await conn.BeginTransactionAsync();
-                var tran = new PostgresCronTransaction(dbTran, conn, _config.TimeZone, IsCitus);
+                var tran = new PostgresCronTransaction(dbTran, conn, _config.TimeZone, ShardConfig);
                 var val = await action(tran);
                 await tran.CommitAsync();
                 return val;
@@ -64,7 +66,7 @@ namespace NQueue.Internal.Db.Postgres
                     if (!_dbMigrationRan)
                     {
                         await _config.WithDbConnection(async conn =>
-                            await PostgresDbMigrator.UpdateDbSchema(conn, IsCitus));
+                            await PostgresDbMigrator.UpdateDbSchema(conn, _isCitus));
     
                         _dbMigrationRan = true;
                     }
@@ -95,19 +97,20 @@ namespace NQueue.Internal.Db.Postgres
 
         }
 
-        public int ShardCount => IsCitus ? 16 : 1;
+        public new ShardConfig ShardConfig => base.ShardConfig;
 
 
-        public IReadOnlyList<int> GetShardOrderForTesting() => ShardCount == 1
-            ? new[] { 0 }
-            : RotateShardOrder();
+        public IReadOnlyList<int> GetShardOrderForTesting() =>
+            ShardConfig.ConsumingShardCount == 1
+                ? new[] { 0 }
+                : RotateShardOrder(ShardConfig.ConsumingShardCount);
 
-        private IReadOnlyList<int> RotateShardOrder()
+        private IReadOnlyList<int> RotateShardOrder(int shardCount)
         {
             lock (typeof(PostgresWorkItemDbConnection))
             {
-                if (RotatingShardOrderForTests == null || RotatingShardOrderForTests.Count != ShardCount)
-                    RotatingShardOrderForTests = Enumerable.Range(0, ShardCount).ToList();
+                if (RotatingShardOrderForTests == null || RotatingShardOrderForTests.Count != shardCount)
+                    RotatingShardOrderForTests = Enumerable.Range(0, shardCount).ToList();
                 else
                     RotatingShardOrderForTests = RotatingShardOrderForTests.Skip(1)
                         .Concat(new[] { RotatingShardOrderForTests.First() })

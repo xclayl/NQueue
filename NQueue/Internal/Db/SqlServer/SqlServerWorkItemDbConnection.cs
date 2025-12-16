@@ -25,6 +25,7 @@ namespace NQueue.Internal.Db.SqlServer
             _config = config;
         }
 
+        
         public async ValueTask<IWorkItemDbProcs> Get()
         {
             await EnsureDbMigrationRuns();
@@ -117,7 +118,7 @@ namespace NQueue.Internal.Db.SqlServer
             });
         }
 
-        public int ShardCount => 1;
+        public ShardConfig ShardConfig { get; } = new(1);
         public IReadOnlyList<int> GetShardOrderForTesting() => new[] { 0 };
         
         public async IAsyncEnumerable<WorkItemForTests> GetWorkItemsForTests()

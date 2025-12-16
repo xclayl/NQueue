@@ -13,7 +13,9 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using NQueue.Internal.Model;
 using NQueue.Testing;
+using OpenTelemetry.Logs;
 using Xunit;
 
 namespace NQueue.Tests.DbTesting;
@@ -62,7 +64,8 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
+        
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -93,7 +96,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -117,7 +120,6 @@ public class DbTests : IAsyncLifetime
     }
 
 
-    
     [Theory]
     [MemberData(nameof(MyTheoryData))]
     public async Task ProcessAllRegEx2(DbType dbType)
@@ -125,7 +127,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -202,7 +204,7 @@ public class DbTests : IAsyncLifetime
         
         
 
-        foreach (var shard in Enumerable.Range(0, dbCnn.ShardCount))
+        foreach (var shard in Enumerable.Range(0, dbCnn.ShardConfig.ConsumingShardCount))
         {
             var queuedItem = await procs.NextWorkItem(shard);
             if (queuedItem == null)
@@ -217,7 +219,7 @@ public class DbTests : IAsyncLifetime
 
         
 
-        foreach (var shard in Enumerable.Range(0, dbCnn.ShardCount))
+        foreach (var shard in Enumerable.Range(0, dbCnn.ShardConfig.ConsumingShardCount))
         {
             var queuedItem = await procs.NextWorkItem(shard);
             if (queuedItem == null)
@@ -234,7 +236,7 @@ public class DbTests : IAsyncLifetime
             @"{""a"": 4}", null);
 
 
-        foreach (var shard in Enumerable.Range(0, dbCnn.ShardCount))
+        foreach (var shard in Enumerable.Range(0, dbCnn.ShardConfig.ConsumingShardCount))
         {
             var queuedItem = await procs.NextWorkItem(shard);
             if (queuedItem == null)
@@ -247,7 +249,7 @@ public class DbTests : IAsyncLifetime
             break;
         }
 
-        foreach (var shard in Enumerable.Range(0, dbCnn.ShardCount))
+        foreach (var shard in Enumerable.Range(0, dbCnn.ShardConfig.ConsumingShardCount))
         {
             await procs.PurgeWorkItems(shard);
         }
@@ -272,7 +274,7 @@ public class DbTests : IAsyncLifetime
         item.Should().BeNull();
 
 
-        var parentShard = CalculateShard("parent-queue", dbType);
+        var parentShard = CalculateShard("parent-queue", dbCnn.ShardConfig.ConsumingShardCount);
 
         await procs.EnqueueWorkItem(null, new Uri("http://localhost/api/NQueue/NoOp"), "parent-queue", "debug-info", false,
             @"{""a"": 3}", null);
@@ -285,7 +287,7 @@ public class DbTests : IAsyncLifetime
             throw new Exception("Could not find parent queue item");
 
      
-        var childShard = CalculateShard("child-queue", dbType);
+        var childShard = CalculateShard("child-queue", dbCnn.ShardConfig.ConsumingShardCount);
         await procs.EnqueueWorkItem(null, new Uri("http://localhost/api/NQueue/NoOp"), "child-queue", "debug-info", false,
             @"{""a"": 3}", "parent-queue");
 
@@ -338,7 +340,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -419,7 +421,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -452,7 +454,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -490,7 +492,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -507,7 +509,8 @@ public class DbTests : IAsyncLifetime
             await cnn.OpenAsync();
             await ExecuteProcedure(cnn, "NQueue.PauseQueue", 
                 SqlParameter("my-queue-name"),
-                SqlParameter(CalculateShard("my-queue-name", dbType)),
+                SqlParameter(CalculateShard("my-queue-name", fakeService.Config.ShardConfig.ConsumingShardCount)),
+                SqlParameter(fakeService.Config.ShardConfig.ConsumingShardCount),
                 SqlParameter(DateTimeOffset.Now.ToUniversalTime()));
         }
         
@@ -534,7 +537,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -565,7 +568,8 @@ public class DbTests : IAsyncLifetime
             
             await ExecuteProcedure(cnn, "NQueue.PauseQueue", 
                 SqlParameter("my-queue-name"),
-                SqlParameter(CalculateShard("my-queue-name", dbType)),
+                SqlParameter(CalculateShard("my-queue-name", fakeService.Config.ShardConfig.ConsumingShardCount)),
+                SqlParameter(fakeService.Config.ShardConfig.ConsumingShardCount),
                 SqlParameter(DateTimeOffset.Now.ToUniversalTime()));
 
 
@@ -574,7 +578,7 @@ public class DbTests : IAsyncLifetime
 
             var procs = await dbCnn.Get();
 
-            await procs.CompleteWorkItem(workItemId, CalculateShard("my-queue-name", dbType), null);
+            await procs.CompleteWorkItem(workItemId, CalculateShard("my-queue-name", fakeService.Config.ShardConfig.ConsumingShardCount), null);
         }
         
         
@@ -613,7 +617,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -630,7 +634,8 @@ public class DbTests : IAsyncLifetime
 
             await ExecuteProcedure(cnn, "NQueue.PauseQueue", 
                 SqlParameter("my-queue-name"),
-                SqlParameter(CalculateShard("my-queue-name", dbType)),
+                SqlParameter(CalculateShard("my-queue-name", fakeService.Config.ShardConfig.ConsumingShardCount)),
+                SqlParameter(fakeService.Config.ShardConfig.ConsumingShardCount),
                 SqlParameter(DateTimeOffset.Now.ToUniversalTime()));
         }
         
@@ -680,7 +685,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -697,7 +702,8 @@ public class DbTests : IAsyncLifetime
 
             await ExecuteProcedure(cnn, "NQueue.PauseQueue", 
                 SqlParameter("my-queue-name"),
-                SqlParameter(CalculateShard("my-queue-name", dbType)),
+                SqlParameter(CalculateShard("my-queue-name", fakeService.Config.ShardConfig.ConsumingShardCount)),
+                SqlParameter(fakeService.Config.ShardConfig.ConsumingShardCount),
                 SqlParameter(DateTimeOffset.Now.ToUniversalTime()));
         }
         
@@ -742,7 +748,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -756,7 +762,7 @@ public class DbTests : IAsyncLifetime
 
 
 
-        var workItem = await procs.NextWorkItem(CalculateShard("my-queue-name", dbType));
+        var workItem = await procs.NextWorkItem(CalculateShard("my-queue-name", fakeService.Config.ShardConfig.ConsumingShardCount));
         workItem.Should().NotBeNull();
         
         await using (var cnn = await _dbCreators[dbType].CreateConnection())
@@ -764,12 +770,13 @@ public class DbTests : IAsyncLifetime
             await cnn.OpenAsync();
             await ExecuteProcedure(cnn, "NQueue.PauseQueue", 
                 SqlParameter("my-queue-name"),
-                SqlParameter(CalculateShard("my-queue-name", dbType)),
+                SqlParameter(CalculateShard("my-queue-name", fakeService.Config.ShardConfig.ConsumingShardCount)),
+                SqlParameter(fakeService.Config.ShardConfig.ConsumingShardCount),
                 SqlParameter(DateTimeOffset.Now.ToUniversalTime()));
         }
         
         
-        await procs.CompleteWorkItem(workItem.WorkItemId, CalculateShard("my-queue-name", dbType), null);
+        await procs.CompleteWorkItem(workItem.WorkItemId, CalculateShard("my-queue-name", fakeService.Config.ShardConfig.ConsumingShardCount), null);
 
         // assert
         // var http = app.CreateClient();
@@ -795,7 +802,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -850,7 +857,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -907,7 +914,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -1006,7 +1013,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -1067,7 +1074,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -1121,7 +1128,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -1164,7 +1171,7 @@ public class DbTests : IAsyncLifetime
         // arrange 
         var baseUrl = new Uri("http://localhost:8501");
         var fakeApp = new FakeWebApp();
-        var fakeService = new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl);
+        var fakeService = CreateFakeService(dbType, baseUrl);
         await fakeService.DeleteAllNQueueData();
         fakeApp.FakeService = fakeService;
 
@@ -1206,9 +1213,321 @@ public class DbTests : IAsyncLifetime
     }
 
 
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task ShardSchemeMigrationDontConsumeOtherShardSchemes(DbType dbType)
+    {
+        if (dbType != DbType.Postgres && dbType != DbType.PostgresCitus)
+            return;
+        
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        {
+            var fakeApp = new FakeWebApp();
+            var fakeService3 = CreateFakeService(dbType, baseUrl, new ShardConfig(3));
+
+            await fakeService3.DeleteAllNQueueData();
+            fakeApp.FakeService = fakeService3;
+
+            await using var app = new WebApplicationFactory<Program>()
+                .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl));
+            var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+            var guid = Guid.NewGuid();
+
+            await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"), "name-3");
+            
+            
+            fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+        }
+        
+        
+        // act
+        {
+            var fakeApp = new FakeWebApp();
+            var fakeService4 = CreateFakeService(dbType, baseUrl, new ShardConfig(4));
+
+            fakeApp.FakeService = fakeService4;
+
+            await using var app = new WebApplicationFactory<Program>()
+                .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl));
+            var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+            
+
+            await fakeApp.FakeService.ProcessAll(app.CreateClient, app.Services.GetRequiredService<ILoggerFactory>());
+            
+            
+            // assert
+            var http = app.CreateClient();
+            using var r = await http.GetAsync(await nQueueClient.Localhost($"api/NQueue/GetMessage"));
+            r.EnsureSuccessStatusCode();
+            (await r.Content.ReadAsStringAsync()).Should().Be("");
+            fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+        }
+
+        
+    }
+
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task ShardSchemeMigrationEnqueueWorkItemBasedOnTheProducerShardScheme(DbType dbType)
+    {
+        if (dbType != DbType.Postgres && dbType != DbType.PostgresCitus)
+            return;
+        
+        // arrange
+        
+        var guid = Guid.NewGuid();
+        var baseUrl = new Uri("http://localhost:8501");
+        {
+            var fakeApp = new FakeWebApp();
+            var fakeService3 = CreateFakeService(dbType, baseUrl, new ShardConfig {ConsumingShardCount = 5, ProducingShardCount = 3});
+
+            await fakeService3.DeleteAllNQueueData();
+            fakeApp.FakeService = fakeService3;
+
+            await using var app = new WebApplicationFactory<Program>()
+                .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl));
+            var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+
+            await nQueueClient.Enqueue(await nQueueClient.Localhost($"api/NQueue/SetMessage/{guid}"), "name-3");
+            
+            fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+        }
+        
+        
+        // act
+        {
+            var fakeApp = new FakeWebApp();
+            var fakeService4 = CreateFakeService(dbType, baseUrl, new ShardConfig {ConsumingShardCount = 3, ProducingShardCount = 4});
+
+            fakeApp.FakeService = fakeService4;
+
+            await using var app = new WebApplicationFactory<Program>()
+                .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl));
+            var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+            
+
+            await fakeApp.FakeService.ProcessAll(app.CreateClient, app.Services.GetRequiredService<ILoggerFactory>());
+            
+            
+            // assert
+            var http = app.CreateClient();
+            using var r = await http.GetAsync(await nQueueClient.Localhost($"api/NQueue/GetMessage"));
+            r.EnsureSuccessStatusCode();
+            (await r.Content.ReadAsStringAsync()).Should().Be($"{guid}");
+            fakeApp.FakeLogs.Where(l => l.LogLevel == LogLevel.Error).Should().BeEmpty();
+        }
+
+        
+        
+    }
+    
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task ShardSchemeMigrationCompleteWorkItemBasedOnTheConsumerShardScheme(DbType dbType)
+    {
+        if (dbType != DbType.Postgres && dbType != DbType.PostgresCitus)
+            return;
+        
+        // arrange 
+        {
+            var dbCnn = await _dbCreators[dbType]
+                .CreateWorkItemDbConnection(new() { ProducingShardCount = 5, ConsumingShardCount = 3 });
+
+            var procs = await dbCnn.Get();
+            await procs.DeleteAllNQueueDataForUnitTests();
+
+            await procs.EnqueueWorkItem(null, new Uri("http://localhost/api/NQueue/NoOp"), "queue-name", null, false, null, null);
+        }
+        
+        // act
+        {
+            var dbCnn = await _dbCreators[dbType]
+                .CreateWorkItemDbConnection(new() { ProducingShardCount = 4, ConsumingShardCount = 5 });
+
+            var procs = await dbCnn.Get();
+
+            WorkItemInfo? workItem = null;
+            int? workItemShard = null;
+            foreach (var shard in Enumerable.Range(0, 5))
+            {
+                workItem = await procs.NextWorkItem(shard);
+                workItemShard = shard;
+                if (workItem != null)
+                    break;
+            }
+            workItem.Should().NotBeNull();
+
+
+            await procs.CompleteWorkItem(workItem.WorkItemId, workItemShard.Value, null);
+            
+        }
+
+    
+        // assert
+        {
+            
+            await using var cnn = await _dbCreators[dbType].CreateConnection();
+            await cnn.OpenAsync();
+        
+            await using var cmd = cnn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM NQueue.WorkItem";
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+                throw new Exception("no record");
+
+            reader.GetInt32(0).Should().Be(0);
+        }
+
+    }
+
+    
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task ShardSchemeMigrationFailWorkItemBasedOnTheConsumerShardScheme(DbType dbType)
+    {
+        if (dbType != DbType.Postgres && dbType != DbType.PostgresCitus)
+            return;
+        
+        // arrange 
+        {
+            var dbCnn = await _dbCreators[dbType]
+                .CreateWorkItemDbConnection(new() { ProducingShardCount = 5, ConsumingShardCount = 3 });
+
+            var procs = await dbCnn.Get();
+            await procs.DeleteAllNQueueDataForUnitTests();
+
+            await procs.EnqueueWorkItem(null, new Uri("http://localhost/api/NQueue/NoOp"), "queue-name", null, false, null, null);
+        }
+        
+        // act
+        {
+            var dbCnn = await _dbCreators[dbType]
+                .CreateWorkItemDbConnection(new() { ProducingShardCount = 4, ConsumingShardCount = 5 });
+
+            var procs = await dbCnn.Get();
+
+            WorkItemInfo? workItem = null;
+            int? workItemShard = null;
+            foreach (var shard in Enumerable.Range(0, 5))
+            {
+                workItem = await procs.NextWorkItem(shard);
+                workItemShard = shard;
+                if (workItem != null)
+                    break;
+            }
+            workItem.Should().NotBeNull();
+
+
+            await procs.FailWorkItem(workItem.WorkItemId, workItemShard.Value, null);
+            
+        }
+
+    
+        // assert
+        {
+            
+            await using var cnn = await _dbCreators[dbType].CreateConnection();
+            await cnn.OpenAsync();
+        
+            await using var cmd = cnn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM NQueue.Queue WHERE errorcount = 1";
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+                throw new Exception("no record");
+
+            reader.GetInt32(0).Should().Be(1);
+        }
+
+    }
+    
+    
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task ShardSchemeMigrationDelayWorkItemBasedOnTheConsumerShardScheme(DbType dbType)
+    {
+        if (dbType != DbType.Postgres && dbType != DbType.PostgresCitus)
+            return;
+
+        var start = DateTime.UtcNow;
+        
+        // arrange 
+        {
+            var dbCnn = await _dbCreators[dbType]
+                .CreateWorkItemDbConnection(new() { ProducingShardCount = 5, ConsumingShardCount = 3 });
+
+            var procs = await dbCnn.Get();
+            await procs.DeleteAllNQueueDataForUnitTests();
+
+            await procs.EnqueueWorkItem(null, new Uri("http://localhost/api/NQueue/NoOp"), "queue-name", null, false, null, null);
+        }
+        
+        // act
+        {
+            var dbCnn = await _dbCreators[dbType]
+                .CreateWorkItemDbConnection(new() { ProducingShardCount = 4, ConsumingShardCount = 5 });
+
+            var procs = await dbCnn.Get();
+
+            WorkItemInfo? workItem = null;
+            int? workItemShard = null;
+            foreach (var shard in Enumerable.Range(0, 5))
+            {
+                workItem = await procs.NextWorkItem(shard);
+                workItemShard = shard;
+                if (workItem != null)
+                    break;
+            }
+            workItem.Should().NotBeNull();
+
+
+            await procs.DelayWorkItem(workItem.WorkItemId, workItemShard.Value, null);
+            
+        }
+
+    
+        // assert
+        {
+            
+            await using var cnn = await _dbCreators[dbType].CreateConnection();
+            await cnn.OpenAsync();
+        
+            await using var cmd = cnn.CreateCommand();
+            cmd.CommandText = "SELECT ErrorCount, LockedUntil FROM NQueue.Queue";
+            await using var readerQueue = await cmd.ExecuteReaderAsync();
+            var queues = new List<(int, DateTimeOffset)>();
+            while (await readerQueue.ReadAsync())
+            {
+                queues.Add((readerQueue.GetInt32(0), readerQueue.GetDateTime(1)));
+            }
+
+
+            queues.Should().HaveCount(1);
+            queues.Single().Item1.Should().Be(0);
+            queues.Single().Item2.Should().BeAfter(start);
+        }
+
+    }
+    
+    
+
+    
+    /*
+     * shard scheme migration - external locking - lock released regardless of shard scheme.
+     * shard scheme migration - internal locking - blocking a queue assumes queue is a part of the consumer shard scheme
+     */
+    
 
 
 
+    private NQueueHostedServiceFake CreateFakeService(DbType dbType, Uri baseUrl, ShardConfig? shardConfig = null)
+    {
+        return new NQueueHostedServiceFake(_dbCreators[dbType].CreateConnection, baseUrl, shardConfig ?? _dbCreators[dbType].DefaultShardConfig);
+    }
 
     private async ValueTask<string> GetString(Uri baseUri, string relUrl, Func<HttpClient> httpClientFactory)
     {
@@ -1274,16 +1593,22 @@ public class DbTests : IAsyncLifetime
             return p;
         };
     }
-    private static int CalculateShard(string queueName, DbType dbType)
+    private static int CalculateShard(string queueName, int maxShards)
     {
-        if (dbType != DbType.PostgresCitus)
+        // var maxShards = CalculateMaxShards(dbType);
+        
+        if (maxShards == 1)
             return 0;
             
         using var md5 = MD5.Create();
         var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(queueName));
 
-        var shard = bytes[0] >> 4 & 15;
-
-        return shard;
+        return bytes[0] >> 4 & 15;
     }
+
+    // private static int CalculateMaxShards(DbType dbType)
+    // {
+    //     var maxShards = dbType != DbType.PostgresCitus ? 1 : 16;
+    //     return maxShards;
+    // }
 }

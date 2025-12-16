@@ -29,7 +29,7 @@ namespace NQueue.Internal.Db.SqlServer
             await _tran.CommitAsync();
         }
 
-        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection, string? blockQueueName)
+        public async ValueTask EnqueueWorkItem(Uri url, string? queueName, string debugInfo, bool duplicateProtection)
         {
             await ExecuteNonQuery(
                 _tran, 

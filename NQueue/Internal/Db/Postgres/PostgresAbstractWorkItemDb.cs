@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers.Binary;
 using System.Data;
 using System.Data.Common;
 
@@ -7,11 +8,11 @@ namespace NQueue.Internal.Db.Postgres
     internal abstract class PostgresAbstractWorkItemDb : AbstractWorkItemDb
     {
         TimeZoneInfo _utc = TimeZoneInfo.Utc;
-        protected readonly bool IsCitus;
+        protected readonly ShardConfig ShardConfig;
         
-        protected PostgresAbstractWorkItemDb(TimeZoneInfo tz, bool isCitus) : base(tz)
+        protected PostgresAbstractWorkItemDb(TimeZoneInfo tz, ShardConfig shardConfig) : base(tz)
         {
-            IsCitus = isCitus;
+            ShardConfig = shardConfig;
         }
         
         
@@ -82,6 +83,23 @@ namespace NQueue.Internal.Db.Postgres
                 p.Value = val;
                 return p;
             };
+        }
+        
+        internal int GetShard(byte[] hashBytes, int maxShards)
+        {
+            if (maxShards <= 0)
+                throw new ArgumentOutOfRangeException(nameof(maxShards));
+
+            return (int)(ToUInt32(hashBytes) % (uint)maxShards);
+            
+        }
+        
+        uint ToUInt32(byte[] hashBytes)
+        {
+            if (hashBytes == null || hashBytes.Length != 4)
+                throw new ArgumentException("xxHash32 must be exactly 4 bytes");
+
+            return BinaryPrimitives.ReadUInt32LittleEndian(hashBytes);
         }
     }
 }

@@ -15,6 +15,23 @@ using NQueue.Internal.Model;
 namespace NQueue
 {
 
+    public class ShardConfig
+    {
+        public ShardConfig()
+        {
+            ConsumingShardCount = 1;
+            ProducingShardCount = 1;
+        }
+        public ShardConfig(int shards)
+        {
+            ConsumingShardCount = shards;
+            ProducingShardCount = shards;
+        }
+
+        public int ConsumingShardCount { get; init; }
+        public int ProducingShardCount { get; init; }
+    }
+    
     public class NQueueServiceConfig : IDbConfig
     {
         private readonly IDbConnectionLock _dbLock;
@@ -86,6 +103,21 @@ namespace NQueue
         /// especially through a shored connection pooling, like PG Bouncer.
         /// </summary>
         public bool SingleDbConnectionAtATime { get; set; }
+
+
+        /// <summary>
+        /// The number of shards the work items are partitioned by.  The default is 1 shard.
+        /// You may want to increase this if you find there is lock contention getting new work items in the DB (pg_advisory_xact_lock for postgres).
+        /// If you want to migrate to a different sharding scheme (let's say from 1 shard to 16 shards), first set this property to the old (ie 1) ConsumingShardCount and 16 ProducingShardCount.
+        /// At this point, only work items that were produced on the "1" shard scheme will be consumed, and NQueue will only
+        /// produce work items on the new scheme (16 shards) (mostly true, see below) and none of these new work items (on the shard 16 scheme) will be consumed. 
+        /// Once all the work items are consumed from the original scheme (1 shard), you can change this setting to
+        /// so that both ConsumingShardCount and ProducingShardCount are 16.
+        /// With blocking queues, the assumption is that you will be blocking the running code, so that means it
+        /// was consumed.  So new work items that block an existing queue will be created on the old scheme (ConsumingShardCount)
+        /// </summary>
+        public ShardConfig ShardConfig { get; set; } = new(1);
+        
 
         private async ValueTask<T> WithDbConnectionForDetection<T>(Func<DbConnection?, ValueTask<T>> action)
         {
@@ -174,8 +206,8 @@ namespace NQueue
             switch (dbType)
             {
                 case DbServerTypes.SqlServer: return _workItemDbConnection = new SqlServerWorkItemDbConnection(this);
-                case DbServerTypes.Postgres: return _workItemDbConnection = new PostgresWorkItemDbConnection(this, false);
-                case DbServerTypes.PostgresCitus: return _workItemDbConnection = new PostgresWorkItemDbConnection(this, true);
+                case DbServerTypes.Postgres: return _workItemDbConnection = new PostgresWorkItemDbConnection(this, false, ShardConfig);
+                case DbServerTypes.PostgresCitus: return _workItemDbConnection = new PostgresWorkItemDbConnection(this, true, ShardConfig);
                 case DbServerTypes.InMemory: return _workItemDbConnection = _inMemoryWorkItemDbConnection;
                 default: throw new Exception($"Unknown DB Server type: {dbType}");
             }

@@ -14,5 +14,6 @@ internal class InMemoryDbCreator : IDbCreator
     public ValueTask<DbConnection?> CreateConnection() => ValueTask.FromResult<DbConnection?>(null);
 
     
-    public ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection() => new(_db);
+    public ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection(ShardConfig? shardConfig = null) => new(_db);
+    public ShardConfig DefaultShardConfig => new(1);
 }

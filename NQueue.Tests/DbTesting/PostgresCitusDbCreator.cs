@@ -24,16 +24,18 @@ internal class PostgresCitusDbCreator : IDbCreator
         .Build();
 
 
-    public async ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection()
+    public async ValueTask<IWorkItemDbConnection> CreateWorkItemDbConnection(ShardConfig? shardConfig = null)
     {
         await EnsureDbCreated();
         return new PostgresWorkItemDbConnection(new PostgresDbConfig
         {
             TimeZone = TimeZoneInfo.Local,
-            Cnn = UserConnectionString("nqueue_test")
-        }, true);
+            Cnn = UserConnectionString("nqueue_test"),
+        }, true, shardConfig ?? DefaultShardConfig);
     }
-    
+
+    public ShardConfig DefaultShardConfig => new(16);
+
     private string OwnerConnectionString(string db) =>
         $"User ID=postgres;Password={Password};Host=localhost;Port={_postgreSqlContainer.GetMappedPublicPort(5432)};Database={db}";
     private string UserConnectionString(string user) =>

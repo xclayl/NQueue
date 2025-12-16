@@ -11,4 +11,5 @@ internal interface IDbConfig
     ValueTask WithDbConnection(Func<DbConnection, ValueTask> action);
     ValueTask WithDbConnectionAndRetries(Func<DbConnection, ValueTask> action, ILogger logger);
     ValueTask<T> WithDbConnection<T>(Func<DbConnection, ValueTask<T>> action);
+    // ShardConfig ShardConfig { get; }
 }

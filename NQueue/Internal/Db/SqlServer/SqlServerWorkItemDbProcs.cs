@@ -114,12 +114,12 @@ namespace NQueue.Internal.Db.SqlServer
             });
         }
 
-        public ValueTask AcquireExternalLock(string queueName, string externalLockId)
+        public ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId)
         {
             throw new NotImplementedException();
         }
 
-        public ValueTask ReleaseExternalLock(string queueName, string externalLockId)
+        public ValueTask ReleaseExternalLock(string queueName, int maxShards, string externalLockId)
         {
             throw new NotImplementedException();
         }

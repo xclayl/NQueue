@@ -101,37 +101,55 @@ namespace NQueue
             
             var query = await conn.Get();
 
-            var externalLockId = BuildExternalLockId(resourceName, queueName);
+            var externalLockInfo = BuildExternalLockId(resourceName, queueName, config.ShardConfig.ConsumingShardCount);  // the assumption is that you're locking yourself, so it was consumed
 
-            await query.AcquireExternalLock(queueName, externalLockId);
+            await query.AcquireExternalLock(queueName, externalLockInfo.maxShards, externalLockInfo.lockId);
 
             try
             {
-                await triggerExternalCallback(externalLockId);
+                await triggerExternalCallback(externalLockInfo.lockId);
             }
             catch
             {
-                await query.ReleaseExternalLock(queueName, externalLockId);
+                await query.ReleaseExternalLock(queueName, externalLockInfo.maxShards, externalLockInfo.lockId);
                 throw;
             }
         }
 
-        private string BuildExternalLockId(string resourceName, string queueName)
+        private (string lockId, int maxShards) BuildExternalLockId(string resourceName, string queueName, int maxShards)
         {
-            return $"{queueName.Length}.{queueName}.{resourceName}";
+            return ($"{maxShards}:{queueName.Length}.{queueName}.{resourceName}", maxShards);
         }
-        private string ExtractQueueNameFromExternalLockId(string lockId)
+
+        private (string queueName, int maxShards) ExtractQueueNameFromExternalLockId(string lockId,
+            NQueueServiceConfig config)
         {
+            var colonIndex = lockId.IndexOf(':');
             var dotIndex = lockId.IndexOf('.');
+            
             if (dotIndex < 0)
                 throw new FormatException("Invalid external lock id format: " + lockId);
+
+            int maxShards = 1;
+            
+            if (colonIndex > 0 && dotIndex > 0 && colonIndex < dotIndex) // new style lockId format
+            {
+                maxShards = int.Parse(lockId.Substring(0, colonIndex));
+                
+                lockId = lockId.Substring(colonIndex + 1);
+                
+                dotIndex = lockId.IndexOf('.');
+            }
+        
             
             var lenStr = lockId.Substring(0, dotIndex);
             
             if (!int.TryParse(lenStr, out var len))
                 throw new FormatException("Invalid external lock id format: " + lockId);
             
-            return lockId.Substring(dotIndex + 1, len);
+            var queueName = lockId.Substring(dotIndex + 1, len);
+
+            return (queueName, maxShards);
         }
 
         public async ValueTask ReleaseExternalLock(string lockId)
@@ -141,9 +159,9 @@ namespace NQueue
             
             var query = await conn.Get();
 
-            var queueName = ExtractQueueNameFromExternalLockId(lockId);
+            var queueInfo = ExtractQueueNameFromExternalLockId(lockId, config);
             
-            await query.ReleaseExternalLock(queueName, lockId);
+            await query.ReleaseExternalLock(queueInfo.queueName, queueInfo.maxShards, lockId);
             
             _state?.PollNow();
         }
