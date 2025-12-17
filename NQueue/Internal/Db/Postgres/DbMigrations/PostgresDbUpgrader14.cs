@@ -8,6 +8,8 @@ public class PostgresDbUpgrader14
 
 	public async ValueTask Upgrade(DbTransaction tran, bool isCitus)
 	{
+
+		
 		var sql = @"
 
             ALTER TABLE NQueue.Queue             DROP CONSTRAINT IF EXISTS FK_Queue_WorkItem_NextWorkItemId;
@@ -100,6 +102,11 @@ public class PostgresDbUpgrader14
                     FOREIGN KEY(Shard, MaxShards, NextWorkItemId)
                     REFERENCES NQueue.WorkItem (Shard, MaxShards, WorkItemId);
         ";
+		
+		
+		if (isCitus) 
+			sql = "SET LOCAL citus.multi_shard_modify_mode TO 'sequential'; " + sql;
+		
 		await AbstractWorkItemDb.ExecuteNonQueryForMigration(tran, sql.Replace("%%IsSharded%%", isCitus ? "TRUE" : "FALSE"));
 
 		
