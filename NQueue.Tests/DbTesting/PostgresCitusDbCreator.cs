@@ -58,6 +58,9 @@ internal class PostgresCitusDbCreator : IDbCreator
         if (!_dbCreated)
         {
             await _postgreSqlContainer.StartAsync();
+
+            await WaitForUp();
+            
             await ExecuteNonQuery("CREATE DATABASE nqueue_test");
             await ExecuteNonQuery("CREATE EXTENSION citus", "nqueue_test");
             await ExecuteNonQuery($"CREATE USER nqueue_user PASSWORD '{Password}';", "nqueue_test");
@@ -65,6 +68,21 @@ internal class PostgresCitusDbCreator : IDbCreator
         }
 
         _dbCreated = true;
+    }
+
+    private async ValueTask WaitForUp()
+    {
+        var giveUp = DateTimeOffset.Now.AddSeconds(30);
+        while (true)
+            try
+            {
+                await ExecuteNonQuery("SELECT 1");
+                return;
+            }
+            catch (PostgresException e) when (e.Message.Contains("the database system is starting up") && DateTimeOffset.Now < giveUp)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(500));
+            }
     }
     
     public async ValueTask<DbConnection?> CreateConnection()

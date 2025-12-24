@@ -406,35 +406,32 @@ end; $$ language plpgsql;
 
         public async ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId, DbTransaction? tran, Func<ValueTask> action)
         {
-	        var shard = CalculateShard(queueName, maxShards); 
-	      
 	        if (tran == null)
 	        {
 		        await _config.WithDbConnection(async cnn =>
 		        {
-			        await ExecuteProcedure(
-				        "nqueue.AcquireExternalLock",
-				        cnn,
-				        SqlParameter(queueName),
-				        SqlParameter(shard),
-				        SqlParameter(maxShards),
-				        SqlParameter(externalLockId),
-				        SqlParameter(NowUtc)
-			        );
+					await using var tran2 = await cnn.BeginTransactionAsync();
+					await AcquireExternalLock(queueName, maxShards, externalLockId, tran2, action);
+					await tran2.CommitAsync();
 		        });
+		        
+		        return;
 	        }
-	        else
-	        {
-		        await ExecuteProcedure(
-			        tran,
-			        "nqueue.AcquireExternalLock",
-			        SqlParameter(queueName),
-			        SqlParameter(shard),
-			        SqlParameter(maxShards),
-			        SqlParameter(externalLockId),
-			        SqlParameter(NowUtc)
-		        );   
-	        }
+	        
+	        
+	        var shard = CalculateShard(queueName, maxShards); 
+	      
+     
+	        await ExecuteProcedure(
+		        tran,
+		        "nqueue.AcquireExternalLock",
+		        SqlParameter(queueName),
+		        SqlParameter(shard),
+		        SqlParameter(maxShards),
+		        SqlParameter(externalLockId),
+		        SqlParameter(NowUtc)
+	        );   
+	        
 
 	        await action();
         }
