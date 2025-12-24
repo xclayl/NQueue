@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
@@ -64,7 +65,8 @@ namespace NQueue
         /// to the 3rd party, which will make an HTTP call to an endpoint you create that executes
         /// ReleaseExternalLock(lockId).
         /// The lockId is basically the queueName & resourceName concatenated.</param>
-        ValueTask AcquireExternalLock(string resourceName, string queueName, TriggerExternalLock triggerExternalCallback);
+        /// <param name="tran">Database transaction to use when blocking the queue.  One will be created when null.</param>
+        ValueTask AcquireExternalLock(string resourceName, string queueName, TriggerExternalLock triggerExternalCallback, DbTransaction? tran = null);
         
         /// <summary>
         /// Releases the lock on a queue so that it can run again.  
@@ -93,7 +95,7 @@ namespace NQueue
             return Localhost(relativeUri, await _configFactory.GetConfig());
         }
 
-        public async ValueTask AcquireExternalLock(string resourceName, string queueName, TriggerExternalLock triggerExternalCallback)
+        public async ValueTask AcquireExternalLock(string resourceName, string queueName, TriggerExternalLock triggerExternalCallback, DbTransaction? tran = null)
         {
            
             var config = await _configFactory.GetConfig();
@@ -103,17 +105,8 @@ namespace NQueue
 
             var externalLockInfo = BuildExternalLockId(resourceName, queueName, config.ShardConfig.ConsumingShardCount);  // the assumption is that you're locking yourself, so it was consumed
 
-            await query.AcquireExternalLock(queueName, externalLockInfo.maxShards, externalLockInfo.lockId);
-
-            try
-            {
-                await triggerExternalCallback(externalLockInfo.lockId);
-            }
-            catch
-            {
-                await query.ReleaseExternalLock(queueName, externalLockInfo.maxShards, externalLockInfo.lockId);
-                throw;
-            }
+            await query.AcquireExternalLock(queueName, externalLockInfo.maxShards, externalLockInfo.lockId, tran,
+                async () => await triggerExternalCallback(externalLockInfo.lockId));
         }
 
         private (string lockId, int maxShards) BuildExternalLockId(string resourceName, string queueName, int maxShards)

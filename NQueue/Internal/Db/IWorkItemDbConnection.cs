@@ -31,7 +31,7 @@ namespace NQueue.Internal.Db
         ValueTask DelayWorkItem(long workItemId, int shard, ILogger logger);
         ValueTask FailWorkItem(long workItemId, int shard, ILogger logger);
         ValueTask PurgeWorkItems(int shard);
-        ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId);
+        ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId, DbTransaction? tran, Func<ValueTask> action);
         ValueTask ReleaseExternalLock(string queueName, int maxShards, string externalLockId);
 
 

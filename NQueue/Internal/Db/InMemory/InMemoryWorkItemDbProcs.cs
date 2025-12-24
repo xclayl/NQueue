@@ -31,7 +31,19 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
 
     public ValueTask PurgeWorkItems(int shard) => Db.PurgeWorkItems();
 
-    public ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId) => Db.AcquireExternalLock(queueName, externalLockId);
+    public async ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId, DbTransaction? tran, Func<ValueTask> action)
+    {
+        await Db.AcquireExternalLock(queueName, externalLockId);
+        try
+        {
+            await action();
+        }
+        catch
+        {
+            await Db.ReleaseExternalLock(queueName, externalLockId);
+            throw;
+        }
+    }
 
     public ValueTask ReleaseExternalLock(string queueName, int maxShards, string externalLockId) => Db.ReleaseExternalLock(queueName, externalLockId);
 

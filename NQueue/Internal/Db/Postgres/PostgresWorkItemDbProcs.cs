@@ -28,10 +28,10 @@ namespace NQueue.Internal.Db.Postgres
                 var rows = ExecuteReader("SELECT * FROM nqueue.NextWorkItem($1, $2, $3)",
                     cnn,
                     reader => new WorkItemInfo(
-                        reader.GetInt64(reader.GetOrdinal("WorkItemId")),
-                        reader.GetString(reader.GetOrdinal("Url")),
-                        !reader.IsDBNull(reader.GetOrdinal("Internal"))
-                            ? reader.GetString(reader.GetOrdinal("Internal"))
+                        reader.GetInt64(reader.GetOrdinal("o_WorkItemId")),
+                        reader.GetString(reader.GetOrdinal("o_Url")),
+                        !reader.IsDBNull(reader.GetOrdinal("o_Internal"))
+                            ? reader.GetString(reader.GetOrdinal("o_Internal"))
                             : null
                     ),
                     SqlParameter(shard),
@@ -57,7 +57,7 @@ CREATE FUNCTION pg_temp.TestingNextWorkItem (
 	pMaxShards NQueue.WorkItem.MaxShards%TYPE,
 	pQueueName NQueue.WorkItem.QueueName%TYPE,
     pNow timestamp with time zone = NULL
-) RETURNS TABLE(WorkItemId NQueue.WorkItem.WorkItemID%TYPE, Url NQueue.WorkItem.Url%TYPE, Internal NQueue.WorkItem.Internal%TYPE)
+) RETURNS TABLE(o_WorkItemId NQueue.WorkItem.WorkItemID%TYPE, o_Url NQueue.WorkItem.Url%TYPE, o_Internal NQueue.WorkItem.Internal%TYPE)
 as $$
 declare
 	vQueueID NQueue.Queue.QueueID%TYPE;
@@ -67,6 +67,7 @@ declare
 	vBlockingIsCreatingBlock NQueue.BlockingMessage.IsCreatingBlock%TYPE;
 	vBlockingWorkItemId NQueue.BlockingMessage.BlockingWorkItemId%TYPE;
 	vBlockingShard NQueue.BlockingMessage.BlockingShard%TYPE;
+	vBlockingExternalLockId NQueue.BlockingMessage.ExternalLockId%TYPE;
 begin
 
 	IF pNow IS NULL THEN
@@ -119,8 +120,8 @@ begin
 	--------- process blocking messages ---------
 
 
-	SELECT b.BlockingMessageId, b.QueueName, b.IsCreatingBlock, b.BlockingWorkItemId, b.BlockingShard
-	INTO   vBlockingMessageId,  vBlockingQueueName, vBlockingIsCreatingBlock, vBlockingWorkItemId, vBlockingShard
+	SELECT b.BlockingMessageId, b.QueueName, b.IsCreatingBlock, b.BlockingWorkItemId, b.BlockingShard, b.ExternalLockId
+	INTO   vBlockingMessageId,  vBlockingQueueName, vBlockingIsCreatingBlock, vBlockingWorkItemId, vBlockingShard, vBlockingExternalLockId
 	FROM
 		NQueue.BlockingMessage b
 	WHERE
@@ -133,26 +134,56 @@ begin
 
 	WHILE vBlockingMessageId IS NOT NULL LOOP
 		
-		IF vBlockingWorkItemId IS NULL OR vBlockingShard IS NULL THEN
-			RAISE EXCEPTION 'That''s weird. vBlockingWorkItemId and vBlockingShard shouldn''t be NULL here.';
-		END IF;
 
-		IF vBlockingIsCreatingBlock THEN
-			UPDATE NQueue.Queue q
-			SET BlockedBy = BlockedBy || (vBlockingWorkItemId, vBlockingShard)::nqueue.block
-			WHERE q.Shard = pShard 
-				AND q.MaxShards = pMaxShards
-				AND q.Name = vBlockingQueueName;
-		ELSE
-			UPDATE NQueue.Queue q
-			SET BlockedBy = array(
-                SELECT ((elem).WorkItemId, (elem).Shard)::nqueue.block
-                FROM unnest(q.BlockedBy) AS elem
-                WHERE NOT ((elem).WorkItemId = vBlockingWorkItemId AND (elem).Shard = vBlockingShard)
-			)
-			WHERE q.Shard = pShard 
-				AND q.MaxShards = pMaxShards
-				AND q.Name = vBlockingQueueName;
+		IF vBlockingWorkItemId IS NULL AND vBlockingShard IS NULL AND vBlockingExternalLockId IS NOT NULL THEN
+
+		    SELECT q.QueueID
+		    INTO   vQueueId
+		    FROM NQueue.Queue q
+		    WHERE q.Name = vBlockingQueueName 
+				AND q.Shard = pShard
+				AND q.MaxShards = pMaxShards;
+
+
+		    IF vQueueId IS NOT NULL THEN
+			    UPDATE NQueue.Queue q
+			    SET ExternalLockId = vBlockingExternalLockId
+			    WHERE q.QueueId = vQueueId
+					AND q.Shard = pShard
+					AND q.MaxShards = pMaxShards;
+			ELSE		
+				WITH wi AS (
+				    INSERT INTO NQueue.WorkItem (Url, DebugInfo, CreatedAt, QueueName, IsIngested, Internal, Shard, MaxShards)
+					VALUES ('noop:', NULL, pNow, vBlockingQueueName, TRUE, NULL, pShard, pMaxShards)
+				    RETURNING WorkItemID
+				)
+				INSERT INTO NQueue.Queue (Name, NextWorkItemId, ErrorCount, LockedUntil, Shard, MaxShards, IsPaused, BlockedBy, ExternalLockId)
+				SELECT vBlockingQueueName, wi.WorkItemID, 0, pNow, pShard, pMaxShards, FALSE, ARRAY[]::nqueue.block[], vBlockingExternalLockId
+				FROM wi;
+		    END IF;
+
+		ELSIF vBlockingWorkItemId IS NOT NULL AND vBlockingShard IS NOT NULL AND vBlockingExternalLockId IS NULL THEN
+
+			IF vBlockingIsCreatingBlock THEN
+				UPDATE NQueue.Queue q
+				SET BlockedBy = BlockedBy || (vBlockingWorkItemId, vBlockingShard)::nqueue.block
+				WHERE q.Shard = pShard 
+					AND q.MaxShards = pMaxShards
+					AND q.Name = vBlockingQueueName;
+			ELSE
+				UPDATE NQueue.Queue q
+				SET BlockedBy = array(
+	                SELECT ((elem).WorkItemId, (elem).Shard)::nqueue.block
+	                FROM unnest(q.BlockedBy) AS elem
+	                WHERE NOT ((elem).WorkItemId = vBlockingWorkItemId AND (elem).Shard = vBlockingShard)
+				)
+				WHERE q.Shard = pShard 
+					AND q.MaxShards = pMaxShards
+					AND q.Name = vBlockingQueueName;
+			END IF; 		
+
+		ELSE 
+			RAISE EXCEPTION 'That''s weird. vBlockingWorkItemId and vBlockingShard shouldn''t be NULL here, or vBlockingExternalLockId shouldn''t be NULL';
 		END IF; 		
 
 
@@ -160,8 +191,8 @@ begin
 		DELETE FROM NQueue.BlockingMessage b WHERE b.QueueShard = pShard AND b.QueueMaxShards = pMaxShards AND b.BlockingMessageId = vBlockingMessageId;
 
 
-		SELECT b.BlockingMessageId, b.QueueName, b.IsCreatingBlock, b.BlockingWorkItemId, b.BlockingShard
-		INTO   vBlockingMessageId, vBlockingQueueName, vBlockingIsCreatingBlock, vBlockingWorkItemId, vBlockingShard
+		SELECT b.BlockingMessageId, b.QueueName, b.IsCreatingBlock, b.BlockingWorkItemId, b.BlockingShard, ExternalLockId
+		INTO   vBlockingMessageId, vBlockingQueueName, vBlockingIsCreatingBlock, vBlockingWorkItemId, vBlockingShard, vBlockingExternalLockId
 		FROM
 			NQueue.BlockingMessage b
 		WHERE
@@ -229,10 +260,10 @@ end; $$ language plpgsql;
 		        var rows = ExecuteReader("SELECT * FROM pg_temp.TestingNextWorkItem($1, $2, $3, $4)",
 			        cnn,
 			        reader => new WorkItemInfo(
-				        reader.GetInt64(reader.GetOrdinal("WorkItemId")),
-				        reader.GetString(reader.GetOrdinal("Url")),
-				        !reader.IsDBNull(reader.GetOrdinal("Internal"))
-					        ? reader.GetString(reader.GetOrdinal("Internal"))
+				        reader.GetInt64(reader.GetOrdinal("o_WorkItemId")),
+				        reader.GetString(reader.GetOrdinal("o_Url")),
+				        !reader.IsDBNull(reader.GetOrdinal("o_Internal"))
+					        ? reader.GetString(reader.GetOrdinal("o_Internal"))
 					        : null
 			        ),
 			        SqlParameter(shard),
@@ -373,22 +404,39 @@ end; $$ language plpgsql;
         
         
 
-        public async ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId)
+        public async ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId, DbTransaction? tran, Func<ValueTask> action)
         {
 	        var shard = CalculateShard(queueName, maxShards); 
-	        
-	        await _config.WithDbConnection(async cnn =>
+	      
+	        if (tran == null)
+	        {
+		        await _config.WithDbConnection(async cnn =>
+		        {
+			        await ExecuteProcedure(
+				        "nqueue.AcquireExternalLock",
+				        cnn,
+				        SqlParameter(queueName),
+				        SqlParameter(shard),
+				        SqlParameter(maxShards),
+				        SqlParameter(externalLockId),
+				        SqlParameter(NowUtc)
+			        );
+		        });
+	        }
+	        else
 	        {
 		        await ExecuteProcedure(
+			        tran,
 			        "nqueue.AcquireExternalLock",
-			        cnn,
 			        SqlParameter(queueName),
 			        SqlParameter(shard),
 			        SqlParameter(maxShards),
 			        SqlParameter(externalLockId),
 			        SqlParameter(NowUtc)
-		        );
-	        });
+		        );   
+	        }
+
+	        await action();
         }
 
         public async ValueTask ReleaseExternalLock(string queueName, int maxShards, string externalLockId)

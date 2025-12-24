@@ -114,7 +114,7 @@ namespace NQueue.Internal.Db.SqlServer
             });
         }
 
-        public ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId)
+        public ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId, DbTransaction? tran, Func<ValueTask> action)
         {
             throw new NotImplementedException();
         }

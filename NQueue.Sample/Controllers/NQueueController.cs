@@ -128,6 +128,20 @@ namespace NQueue.Sample.Controllers
             return Ok("AcquireExternalLock Done");
         }
         [HttpGet]
+        public async ValueTask<IActionResult> AcquireExternalLockAndRollback([FromQuery] string resourceName, [FromQuery] string queueName)
+        {
+            await using var dataSource = NpgsqlDataSource.Create("User Id=nqueueuser;Password=ihSH3jqeVb7giIgOkohX;Server=localhost;Port=15532;Database=NQueueSample;SslMode=Disable;");
+ 
+            await using var cnn = await dataSource.OpenConnectionAsync();
+            await using var tran = await cnn.BeginTransactionAsync();
+
+            await _client.AcquireExternalLock(resourceName, queueName, async (lockId) => _lockIds.TryAdd(new(queueName, resourceName), lockId), tran);
+
+            await tran.RollbackAsync();
+            
+            return Ok("AcquireExternalLock Done");
+        }
+        [HttpGet]
         public async ValueTask<IActionResult> ReleaseExternalLock([FromQuery] string lockId)
         {
             await _client.ReleaseExternalLock(lockId);

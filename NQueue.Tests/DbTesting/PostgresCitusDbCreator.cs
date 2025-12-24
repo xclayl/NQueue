@@ -37,9 +37,9 @@ internal class PostgresCitusDbCreator : IDbCreator
     public ShardConfig DefaultShardConfig => new(16);
 
     private string OwnerConnectionString(string db) =>
-        $"User ID=postgres;Password={Password};Host=localhost;Port={_postgreSqlContainer.GetMappedPublicPort(5432)};Database={db}";
+        $"User ID=postgres;Password={Password};Host=localhost;Port={_postgreSqlContainer.GetMappedPublicPort(5432)};Database={db};Include Error Detail=true";
     private string UserConnectionString(string user) =>
-        $"User ID=nqueue_user;Password={Password};Host=localhost;Port={_postgreSqlContainer.GetMappedPublicPort(5432)};Database=nqueue_test";
+        $"User ID=nqueue_user;Password={Password};Host=localhost;Port={_postgreSqlContainer.GetMappedPublicPort(5432)};Database=nqueue_test;Include Error Detail=true";
 
     
     private async ValueTask ExecuteNonQuery(string sql, string? db = null)
