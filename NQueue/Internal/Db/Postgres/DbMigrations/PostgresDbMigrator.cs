@@ -23,7 +23,7 @@ end; $$");
             var attempts = 0;
             var highestVersionDetected = 0;
 
-            while (currentVersion != 15)
+            while (currentVersion != 16)
             {
                 attempts++;
                 if (attempts > 100)
@@ -55,6 +55,10 @@ end; $$");
                     // version "0" DB. Upgrade to version 1
 
                     currentVersion = 0;
+                }
+                else if (PostgresSchemaInfo.IsVersion16(dbObjects))
+                {
+                    currentVersion = 16;
                 }
                 else if (PostgresSchemaInfo.IsVersion15(dbObjects))
                 {
@@ -118,8 +122,14 @@ end; $$");
                 }
                 else
                 {
+                    var expected = PostgresSchemaInfo.Version16.OrderBy(o => o.Type).ThenBy(o => o.Name).Select(o => $"{o.Type} {o.Name}: {o.DataType}".ToLowerInvariant()).ToList();
+                    var actual = dbObjects.OrderBy(o => o.Type).ThenBy(o => o.Name).Select(o => $"{o.Type} {o.Name}: {o.DataType}".ToLowerInvariant()).ToList();
+                    
+                    
                     throw new Exception("The NQueue schema has an unknown structure.  One option is to move all tables & stored procedures to another schema so that NQueue can recreate them from scratch.  Found: \r\n" +
-                                        string.Join("\r\n", dbObjects.OrderBy(o => o.Type).ThenBy(o => o.Name).Select(o => $"{o.Type} {o.Name}: {o.DataType}")));
+                                        string.Join("\r\n", actual) +
+                                        "\r\n\r\nExtra schema found:\r\n" + string.Join("\r\n", actual.Except(expected)) +
+                                        "\r\n\r\nMissing schema:\r\n" + string.Join("\r\n", expected.Except(actual)));
                 }
 
                 highestVersionDetected = Math.Max(highestVersionDetected, currentVersion);
@@ -183,6 +193,10 @@ end; $$");
                 if (currentVersion == 14)
                 {
                     await new PostgresDbUpgrader15().Upgrade(tran, isCitus);
+                }
+                if (currentVersion == 15)
+                {
+                    await new PostgresDbUpgrader16().Upgrade(tran, isCitus);
                 }
             }
 

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace NQueue.Internal.Db.Postgres.DbMigrations;
 
-public class PostgresDbUpgrader06
+internal class PostgresDbUpgrader06
 {
     
     

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace NQueue.Internal.Model;
 
-public class DisposableList<T> : List<T>, IDisposable where T : IDisposable
+internal class DisposableList<T> : List<T>, IDisposable where T : IDisposable
 {
     
     public void Dispose()

@@ -114,10 +114,6 @@ namespace NQueue.Internal.Db.SqlServer
             });
         }
 
-        public ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId, DbTransaction? tran, Func<ValueTask> action)
-        {
-            throw new NotImplementedException();
-        }
 
         public ValueTask ReleaseExternalLock(string queueName, int maxShards, string externalLockId)
         {
@@ -125,7 +121,7 @@ namespace NQueue.Internal.Db.SqlServer
         }
 
 
-        public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson, string? blockQueueName)
+        public async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson, string? blockQueueName, string? externalLockIdWhenComplete)
         {
             if (tran == null)
             {

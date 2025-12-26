@@ -14,10 +14,10 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
     public readonly InMemoryDb Db = new();
 
     public ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo,
-        bool duplicateProtection, string? internalJson, string? blockQueueName)
+        bool duplicateProtection, string? internalJson, string? blockQueueName, string? externalLockIdWhenComplete)
     {
         queueName ??= Guid.NewGuid().ToString();
-        return Db.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicateProtection, internalJson, blockQueueName);
+        return Db.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicateProtection, internalJson, blockQueueName, externalLockIdWhenComplete);
     }
 
     public ValueTask<WorkItemInfo?> NextWorkItem(int shard) => Db.NextWorkItem();
@@ -31,19 +31,6 @@ internal class InMemoryWorkItemDbProcs : IWorkItemDbProcs
 
     public ValueTask PurgeWorkItems(int shard) => Db.PurgeWorkItems();
 
-    public async ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId, DbTransaction? tran, Func<ValueTask> action)
-    {
-        await Db.AcquireExternalLock(queueName, externalLockId);
-        try
-        {
-            await action();
-        }
-        catch
-        {
-            await Db.ReleaseExternalLock(queueName, externalLockId);
-            throw;
-        }
-    }
 
     public ValueTask ReleaseExternalLock(string queueName, int maxShards, string externalLockId) => Db.ReleaseExternalLock(queueName, externalLockId);
 
@@ -106,7 +93,7 @@ class CronWorkItemTran : ICronTransaction
         
         foreach (var tempWorkItem in _tempWorkItems)
         {
-            await _inMemoryDb.EnqueueWorkItem(null, tempWorkItem.Url, tempWorkItem.QueueName, tempWorkItem.DebugInfo, tempWorkItem.DuplicateProtection, tempWorkItem.Internal, null);
+            await _inMemoryDb.EnqueueWorkItem(null, tempWorkItem.Url, tempWorkItem.QueueName, tempWorkItem.DebugInfo, tempWorkItem.DuplicateProtection, tempWorkItem.Internal, null, null);
         }
 
         foreach (var tempCj in _tempCronJobState)

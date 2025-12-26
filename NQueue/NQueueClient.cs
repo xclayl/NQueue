@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
@@ -12,12 +10,12 @@ namespace NQueue
 {
     
     /// <summary>
-    /// Callback to provide the generated lockId so that you can trigger the callback to Release the lock.
+    /// Callback to provide the URL which will trigger the external process.  
     /// </summary>
-    public delegate ValueTask TriggerExternalLock(string lockId);
+    public delegate Uri ConvertExternalLockIdToUrl(string lockId);
     
     /// <summary>
-    /// Used for enqueuing Work items
+    /// Used for enqueuing Work items.  This is thread-safe, and registered as a Singleton.
     /// </summary>
     public interface INQueueClient
     {
@@ -31,7 +29,7 @@ namespace NQueue
         /// when errors occur (blocking Work Items in the same queue)</param>
         /// <param name="tran">Database transaction to use when adding the Work Item</param>
         /// <param name="debugInfo">A string you can use.  NQueue ignores this.  I've found it useful to
-        /// identify the code that created a Work Item that failed to help debug my code.</param>
+        /// identify the code that created a Work Item that failed, in order to help debug my code.</param>
         /// <param name="duplicatePrevention">If true, it won't add this Work Item if an identical Work Item
         /// Already exists.</param>
         /// <param name="blockQueueName">If set, prevents the queue from running again until this
@@ -51,22 +49,24 @@ namespace NQueue
         /// <returns></returns>
         ValueTask<Uri> Localhost(string relativeUri);
         
-        
-
         /// <summary>
-        /// Locks a queue (preventing it from running) until ReleaseExternalLock(lockId) is called.
+        /// Creates a work-item where when it completes, a lock on the queue is granted (preventing the queue from running) until ReleaseExternalLock(lockId) is called.
+        /// The work-item URL should trigger the external processing.
         /// </summary>
         /// <param name="resourceName">This acts like a 'key' to prevent double releasing the queue accidentally.
         /// You can pass an empty string if this is not a concern.</param>
-        /// <param name="queueName">Name of the queue to lock.</param>
-        /// <param name="triggerExternalCallback">Code to trigger 3rd party processing where you want this queue to
-        /// wait until it is done.
-        /// NQueue will give a lockId to triggerExternalCallback.  The idea is you give this lock id
+        /// <param name="createNewWorkItemUrl">The URL that will trigger the external processing.
+        /// The idea is you give this lock id
         /// to the 3rd party, which will make an HTTP call to an endpoint you create that executes
         /// ReleaseExternalLock(lockId).
         /// The lockId is basically the queueName & resourceName concatenated.</param>
-        /// <param name="tran">Database transaction to use when blocking the queue.  One will be created when null.</param>
-        ValueTask AcquireExternalLock(string resourceName, string queueName, TriggerExternalLock triggerExternalCallback, DbTransaction? tran = null);
+        /// <param name="newWorkItemQueueName">Name of the queue to lock, which is also the queue to add the new work item.</param>
+        /// <param name="tran">Database transaction to use when blocking the queue.</param>
+        /// <param name="debugInfo">A string you can use.  NQueue ignores this.  I've found it useful to
+        /// identify the code that created a Work Item that failed, in order to help debug my code.</param>
+        /// <param name="blockQueueName">If you want this new work item to block a parent queue, provide the parent queue name here.</param>
+        ValueTask BeginAcquireExternalLock(string resourceName, ConvertExternalLockIdToUrl createNewWorkItemUrl, string? newWorkItemQueueName = null, DbTransaction? tran = null,
+            string? debugInfo = null, string? blockQueueName = null);
         
         /// <summary>
         /// Releases the lock on a queue so that it can run again.  
@@ -95,19 +95,6 @@ namespace NQueue
             return Localhost(relativeUri, await _configFactory.GetConfig());
         }
 
-        public async ValueTask AcquireExternalLock(string resourceName, string queueName, TriggerExternalLock triggerExternalCallback, DbTransaction? tran = null)
-        {
-           
-            var config = await _configFactory.GetConfig();
-            var conn = await config.GetWorkItemDbConnection();
-            
-            var query = await conn.Get();
-
-            var externalLockInfo = BuildExternalLockId(resourceName, queueName, config.ShardConfig.ConsumingShardCount);  // the assumption is that you're locking yourself, so it was consumed
-
-            await query.AcquireExternalLock(queueName, externalLockInfo.maxShards, externalLockInfo.lockId, tran,
-                async () => await triggerExternalCallback(externalLockInfo.lockId));
-        }
 
         private (string lockId, int maxShards) BuildExternalLockId(string resourceName, string queueName, int maxShards)
         {
@@ -159,7 +146,7 @@ namespace NQueue
             _state?.PollNow();
         }
 
-        internal static Uri Localhost(string relativeUri, NQueueServiceConfig config)
+        private static Uri Localhost(string relativeUri, NQueueServiceConfig config)
         {
             if (!config.LocalHttpAddresses.Any())
                 throw new Exception(@"LocalHttpAddresses configuration is empty.  Set it using
@@ -201,9 +188,37 @@ myFakeNQueueService.BaseAddress = factory.Server.BaseAddress;
             return new Uri(bestBaseUri, relativeUri);
         }
 
-
-        public async ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null, string? debugInfo = null,
+        public async ValueTask Enqueue(Uri url, string? queueName = null, DbTransaction? tran = null,
+            string? debugInfo = null,
             bool duplicatePrevention = false, string? blockQueueName = null)
+        {
+            await PrivateEnqueue(url, queueName, tran, debugInfo, duplicatePrevention, blockQueueName, null);
+        }
+        
+        
+        public async ValueTask BeginAcquireExternalLock(string resourceName, ConvertExternalLockIdToUrl createNewWorkItemUrl,
+            string? newWorkItemQueueName = null, DbTransaction? tran = null,
+            string? debugInfo = null,
+            string? blockQueueName = null)
+        {
+            newWorkItemQueueName ??= Guid.NewGuid().ToString();
+            var config = await _configFactory.GetConfig();
+            
+            
+            // if we're blocking a parent queue, the new work item must be on the same shard scheme. We want the whole work-item tree to finish.
+            // The assumption is that the queue to block is currently running, so it's on
+            // the Consuming shard scheme.
+            // It doesn't make sense to block a random queue, b/c you don't know if it is running. (assumptions again)
+            var maxShards = blockQueueName != null ? config.ShardConfig.ConsumingShardCount : config.ShardConfig.ProducingShardCount;
+            
+            
+            var lockId = BuildExternalLockId(resourceName, newWorkItemQueueName, maxShards);  
+            
+            await PrivateEnqueue(createNewWorkItemUrl(lockId.lockId), newWorkItemQueueName, tran, debugInfo, false, blockQueueName, lockId.lockId);
+        }
+
+        private async ValueTask PrivateEnqueue(Uri url, string? queueName, DbTransaction? tran, string? debugInfo,
+            bool duplicatePrevention, string? blockQueueName, string? externalLockIdWhenComplete)
         {
             var config = await _configFactory.GetConfig();
             var conn = await config.GetWorkItemDbConnection();
@@ -230,14 +245,13 @@ myFakeNQueueService.BaseAddress = factory.Server.BaseAddress;
 
             
             
-            await query.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicatePrevention, internalJson, blockQueueName);
+            await query.EnqueueWorkItem(tran, url, queueName, debugInfo, duplicatePrevention, internalJson, blockQueueName, externalLockIdWhenComplete);
             
             if (tran == null)
                 _state?.PollNow();
         }
 
 
-        
 
     }
 }

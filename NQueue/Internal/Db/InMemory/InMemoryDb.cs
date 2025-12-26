@@ -8,7 +8,7 @@ using NQueue.Internal.Model;
 
 namespace NQueue.Internal.Db.InMemory;
 
-public class InMemoryDb
+internal class InMemoryDb
 {
     
     private record WorkItemForInMemory
@@ -22,6 +22,7 @@ public class InMemoryDb
         // public bool DuplicateProtection { get; init; }
         public int FailCount { get; init; } = 0;
         public string? BlockQueueName { get; init; }
+        public string? ExternalLockIdWhenComplete { get; set; }
     }
 
     private record Queue
@@ -77,7 +78,8 @@ public class InMemoryDb
             .ToList();
     }
 
-    internal async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string queueName, string? debugInfo, bool duplicateProtection, string? internalJson, string? blockQueueName)
+    internal async ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string queueName, string? debugInfo, bool duplicateProtection, string? internalJson, string? blockQueueName,
+        string? externalLockIdWhenComplete)
     {
         if (tran != null)
             throw new Exception("The in-memory NQueue implementation is not compatible with DB transactions.");
@@ -109,6 +111,7 @@ public class InMemoryDb
             IsIngested = false,
             Internal = internalJson,
             BlockQueueName = blockQueueName,
+            ExternalLockIdWhenComplete = externalLockIdWhenComplete
         };
         _workItems.Add(wi);
 
@@ -148,10 +151,8 @@ public class InMemoryDb
         return new CronWorkItemTran(_lock, this, _cronJobState, () => _nextId++);
     }
 
-    internal async ValueTask<WorkItemInfo?> NextWorkItem(string? queueName = null)
+    private void MakeConsistent()
     {
-        using var _ = await ALock.Wait(_lock);
-
         foreach (var wi in _workItems.OrderBy(wi => wi.WorkItemId).Where(w => !w.IsIngested).ToList())
         {
             if (_queues.All(q => q.QueueName != wi.QueueName))
@@ -201,6 +202,14 @@ public class InMemoryDb
             _blockingMessages.Remove(blockingMessage);
         }
 
+    }
+
+    internal async ValueTask<WorkItemInfo?> NextWorkItem(string? queueName = null)
+    {
+        using var _ = await ALock.Wait(_lock);
+
+        MakeConsistent();
+     
         var now = DateTimeOffset.Now;
 
         // var next = _workItems.FirstOrDefault(w =>
@@ -248,7 +257,9 @@ public class InMemoryDb
     internal async ValueTask CompleteWorkItem(long workItemId)
     {
         using var _ = await ALock.Wait(_lock);
-
+        
+        MakeConsistent();
+        
         var wi = _workItems.Single(w => w.WorkItemId == workItemId);
 
         var queue = _queues.SingleOrDefault(q => q.QueueName == wi.QueueName);
@@ -258,6 +269,20 @@ public class InMemoryDb
 
         if (queue != null)
         {
+
+            if (wi.ExternalLockIdWhenComplete != null)
+            {
+                if (queue.ExternalLockId != null)
+                    throw new Exception("Cannot replace an existing ExternalLockId (this shouldn''t be possible).");
+                
+                _queues.Remove(queue);
+                queue = queue with
+                {
+                    ExternalLockId = wi.ExternalLockIdWhenComplete,
+                };
+                _queues.Add(queue);
+            }
+            
             var nextWorkItemId = _workItems
                 .OrderBy(w => w.WorkItemId)
                 .Where(w =>
@@ -281,6 +306,7 @@ public class InMemoryDb
                         IsIngested = true,
                         Internal = null,
                         BlockQueueName = wi.BlockQueueName,
+                        ExternalLockIdWhenComplete = null,
                     };
                     _workItems.Add(noopWorkItem);
                     
@@ -396,61 +422,35 @@ public class InMemoryDb
         _cronJobState.Clear();
     }
 
-    internal async ValueTask AcquireExternalLock(string queueName, string externalLockId)
-    {
-        using var _ = await ALock.Wait(_lock);
-
-        var queue = _queues.SingleOrDefault(q => q.QueueName == queueName);
-        if (queue != null)
-        {
-            if (queue.ExternalLockId != null)
-                throw new Exception("Cannot acquire a lock when one is already granted.  An alternate pattern would be to create two child work-items instead, each with their own lock");
-            
-            _queues.Remove(queue);
-            _queues.Add(queue with
-            {
-                ExternalLockId = externalLockId
-            });
-        }
-        else
-        {
-            var noopWorkItem = new WorkItemForInMemory
-            {
-                WorkItemId = _nextId++,
-                Url = new Uri("noop:"),
-                QueueName = queueName,
-                DebugInfo = null,
-                IsIngested = true,
-                Internal = null,
-                BlockQueueName = null,
-            };
-            _workItems.Add(noopWorkItem);
-                    
-            _queues.Add(new Queue
-            {
-                QueueName = queueName,
-                NextWorkItemId = noopWorkItem.WorkItemId,
-                LockedUntil = DateTimeOffset.Now,
-                ExternalLockId = externalLockId
-            });
-        }
-    }
 
     internal async ValueTask ReleaseExternalLock(string queueName, string externalLockId)
     {
         using var _ = await ALock.Wait(_lock);
         
+        MakeConsistent();
+        
         var queue = _queues.SingleOrDefault(q => q.QueueName == queueName);
         if (queue != null)
         {
-            if (queue.ExternalLockId != externalLockId)
-                throw new Exception("ExternalLockId does not match");
-            
-            _queues.Remove(queue);
-            _queues.Add(queue with
+            var wi = _workItems.Single(q => q.WorkItemId == queue.NextWorkItemId);
+
+            if (queue.ExternalLockId == externalLockId)
             {
-                ExternalLockId = null
-            });
+                _queues.Remove(queue);
+                _queues.Add(queue with
+                {
+                    ExternalLockId = null
+                });
+            }
+            else if (wi.ExternalLockIdWhenComplete == externalLockId)
+            {
+                _workItems.Remove(wi);
+                _workItems.Add(wi with
+                {
+                    ExternalLockIdWhenComplete = null
+                });
+            }
+            
         }
     }
 }

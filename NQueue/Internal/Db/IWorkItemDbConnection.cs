@@ -24,14 +24,13 @@ namespace NQueue.Internal.Db
 
     internal interface IWorkItemDbProcs
     {
-        ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson, string? blockQueueName);
+        ValueTask EnqueueWorkItem(DbTransaction? tran, Uri url, string? queueName, string? debugInfo, bool duplicateProtection, string? internalJson, string? blockQueueName, string? externalLockIdWhenComplete);
         ValueTask<WorkItemInfo?> NextWorkItem(int shard);
         ValueTask<WorkItemInfo?> NextWorkItem(string queueName, int shard);
         ValueTask CompleteWorkItem(long workItemId, int shard, ILogger logger);
         ValueTask DelayWorkItem(long workItemId, int shard, ILogger logger);
         ValueTask FailWorkItem(long workItemId, int shard, ILogger logger);
         ValueTask PurgeWorkItems(int shard);
-        ValueTask AcquireExternalLock(string queueName, int maxShards, string externalLockId, DbTransaction? tran, Func<ValueTask> action);
         ValueTask ReleaseExternalLock(string queueName, int maxShards, string externalLockId);
 
 

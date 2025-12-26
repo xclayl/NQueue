@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 
@@ -104,45 +107,28 @@ namespace NQueue.Sample.Controllers
         }
         
         [HttpGet]
-        public async ValueTask AcquireExternalLockAndDone([FromQuery] string resourceName, [FromQuery] string queueName)
+        public async ValueTask ReleaseExternalLock([FromQuery] string resourceName, [FromQuery] string queueName)
         {
-            await _client.AcquireExternalLock(resourceName, queueName, async (lockId) => _lockIds.TryAdd(new(queueName, resourceName), lockId));
+            var lockId = _lockIds[new(queueName, resourceName)];
+            await _client.ReleaseExternalLock(lockId);
         }
+        
         [HttpGet]
-        public async ValueTask<IActionResult> AcquireExternalLockAndRunOnceMore([FromQuery] string resourceName, [FromQuery] string queueName)
+        public async ValueTask AcquireExternalLockAndChildWorkItemReleases([FromQuery] string resourceName, [FromQuery] string queueName)
         {
-            if (!_lockIds.ContainsKey(new(queueName, resourceName)))
+            await _client.BeginAcquireExternalLock(resourceName, lockId =>
             {
-                await _client.AcquireExternalLock(resourceName, queueName, async (lockId) => _lockIds.TryAdd(new(queueName, resourceName), lockId));
-                
-                return new StatusCodeResult(261); // re-run     
-            }
-            
-            return Ok(); // done 
+                _lockIds.TryAdd(new(queueName, resourceName), lockId);
+                var uriBuilder = new UriBuilder(new Uri(Request.HttpContext.Request.GetEncodedUrl()));
+                uriBuilder.Path = "/api/NQueue/ReleaseExternalLock";
+                uriBuilder.Query = $"?lockId={WebUtility.UrlEncode(lockId)}";
+                return uriBuilder.Uri;
+            }, blockQueueName: queueName);
         }
+        
+        
         [HttpGet]
-        public async ValueTask<IActionResult> AcquireExternalLockAndThrowException([FromQuery] string resourceName, [FromQuery] string queueName)
-        {
-            await _client.AcquireExternalLock(resourceName, queueName, async (lockId) => throw new Exception("An exception occured"));
-            
-            return Ok("AcquireExternalLock Done");
-        }
-        [HttpGet]
-        public async ValueTask<IActionResult> AcquireExternalLockAndRollback([FromQuery] string resourceName, [FromQuery] string queueName)
-        {
-            await using var dataSource = NpgsqlDataSource.Create("User Id=nqueueuser;Password=ihSH3jqeVb7giIgOkohX;Server=localhost;Port=15532;Database=NQueueSample;SslMode=Disable;");
- 
-            await using var cnn = await dataSource.OpenConnectionAsync();
-            await using var tran = await cnn.BeginTransactionAsync();
-
-            await _client.AcquireExternalLock(resourceName, queueName, async (lockId) => _lockIds.TryAdd(new(queueName, resourceName), lockId), tran);
-
-            await tran.RollbackAsync();
-            
-            return Ok("AcquireExternalLock Done");
-        }
-        [HttpGet]
-        public async ValueTask<IActionResult> ReleaseExternalLock([FromQuery] string lockId)
+        public async ValueTask<IActionResult> ReleaseExternalLock2([FromQuery] string lockId)
         {
             await _client.ReleaseExternalLock(lockId);
             

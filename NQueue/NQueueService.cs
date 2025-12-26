@@ -5,7 +5,7 @@ namespace NQueue
 {
 
     /// <summary>
-    /// Used to influence or inspect the background services
+    /// Used to influence or inspect the background services.  This is thread-safe, and registered as a Singleton.
     /// </summary>
     public interface INQueueService
     {

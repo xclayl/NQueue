@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace NQueue.Internal.Db.Postgres.DbMigrations;
 
-public class PostgresDbUpgrader10
+internal class PostgresDbUpgrader10
 {
     public async ValueTask Upgrade(DbTransaction tran, bool isCitus)
     {
