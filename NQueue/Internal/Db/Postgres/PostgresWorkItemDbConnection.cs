@@ -198,15 +198,19 @@ namespace NQueue.Internal.Db.Postgres
 
         }
 
-        public async ValueTask MakeConsistentForTests(int shard)
+        public async ValueTask MakeConsistentForTests()
         {
             await EnsureDbMigrationRuns();
-            await _config.WithDbConnection(async cnn => await ExecuteNonQuery(
-                "SELECT NQueue.PrivateMakeConsistent($1, $2, $3)",
-                cnn,
-                SqlParameter(shard),
-                SqlParameter(ShardConfig.ConsumingShardCount),
-                SqlParameter(DateTimeOffset.UtcNow)));
+            await _config.WithDbConnection(async cnn =>
+            {
+                foreach (var shard in Enumerable.Range(0, ShardConfig.ConsumingShardCount))
+                    await ExecuteNonQuery(
+                        "SELECT NQueue.PrivateMakeConsistent($1, $2, $3)",
+                        cnn,
+                        SqlParameter(shard),
+                        SqlParameter(ShardConfig.ConsumingShardCount),
+                        SqlParameter(DateTimeOffset.UtcNow));    
+            });
         }
     }
 }

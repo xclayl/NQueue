@@ -20,7 +20,7 @@ namespace NQueue.Internal.Db
         IAsyncEnumerable<WorkItemForTests> GetWorkItemsForTests();
         ValueTask<IReadOnlyList<QueueInfo>> GetQueuesForTesting();
         IAsyncEnumerable<WorkItemForTests> GetCompletedWorkItemsForTests();
-        ValueTask MakeConsistentForTests(int shard);
+        ValueTask MakeConsistentForTests();
     }
 
     internal interface IWorkItemDbProcs

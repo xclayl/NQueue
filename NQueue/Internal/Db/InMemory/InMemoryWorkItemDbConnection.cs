@@ -74,6 +74,6 @@ namespace NQueue.Internal.Db.InMemory
                     0);
         }
         
-        public ValueTask MakeConsistentForTests(int shard) => ValueTask.CompletedTask;
+        public ValueTask MakeConsistentForTests() => ValueTask.CompletedTask;
     }
 }

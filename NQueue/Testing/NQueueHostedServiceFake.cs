@@ -137,8 +137,8 @@ namespace NQueue.Testing
 
             var queueHistory = new List<string>();
             
+            await conn.MakeConsistentForTests();
             var queues = await GetActiveQueues(queueNames, conn, queueHistory);
-            var originalShards = queues.Select(q => q.shard).ToList();
             
             var hadActivity = false;
             
@@ -172,11 +172,8 @@ namespace NQueue.Testing
                     if (!hadActivity)
                         break;
 
-                    foreach (var shard in originalShards) 
-                        await conn.MakeConsistentForTests(shard);
-                    
+                    await conn.MakeConsistentForTests();
                     queues = await GetActiveQueues(queueNames, conn, queueHistory);
-                    originalShards = queues.Select(q => q.shard).ToList();
                     hadActivity = false;
                 }
             }

@@ -181,6 +181,6 @@ namespace NQueue.Internal.Db.SqlServer
 
         }
 
-        public ValueTask MakeConsistentForTests(int shard) => ValueTask.CompletedTask;
+        public ValueTask MakeConsistentForTests() => ValueTask.CompletedTask;
     }
 }
