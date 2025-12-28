@@ -197,5 +197,16 @@ namespace NQueue.Internal.Db.Postgres
                 yield return wi;
 
         }
+
+        public async ValueTask MakeConsistentForTests(int shard)
+        {
+            await EnsureDbMigrationRuns();
+            await _config.WithDbConnection(async cnn => await ExecuteNonQuery(
+                "SELECT NQueue.PrivateMakeConsistent($1, $2, $3)",
+                cnn,
+                SqlParameter(shard),
+                SqlParameter(ShardConfig.ConsumingShardCount),
+                SqlParameter(DateTimeOffset.UtcNow)));
+        }
     }
 }

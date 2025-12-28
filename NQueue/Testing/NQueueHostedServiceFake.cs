@@ -138,6 +138,7 @@ namespace NQueue.Testing
             var queueHistory = new List<string>();
             
             var queues = await GetActiveQueues(queueNames, conn, queueHistory);
+            var originalShards = queues.Select(q => q.shard).ToList();
             
             var hadActivity = false;
             
@@ -170,12 +171,18 @@ namespace NQueue.Testing
                 {
                     if (!hadActivity)
                         break;
+
+                    foreach (var shard in originalShards) 
+                        await conn.MakeConsistentForTests(shard);
                     
                     queues = await GetActiveQueues(queueNames, conn, queueHistory);
+                    originalShards = queues.Select(q => q.shard).ToList();
                     hadActivity = false;
                 }
             }
         }
+
+
 
         private static async ValueTask<List<(string queueName, int shard)>> GetActiveQueues(Regex? queueNamesMatch, IWorkItemDbConnection conn, IReadOnlyList<string> queueHistory)
         {

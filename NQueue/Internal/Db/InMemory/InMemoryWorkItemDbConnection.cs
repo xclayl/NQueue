@@ -73,5 +73,7 @@ namespace NQueue.Internal.Db.InMemory
                 yield return new WorkItemForTests(wi.WorkItemId, wi.Url, wi.QueueName, wi.DebugInfo, wi.Internal,
                     0);
         }
+        
+        public ValueTask MakeConsistentForTests(int shard) => ValueTask.CompletedTask;
     }
 }

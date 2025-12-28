@@ -180,5 +180,7 @@ namespace NQueue.Internal.Db.SqlServer
                 yield return wi;
 
         }
+
+        public ValueTask MakeConsistentForTests(int shard) => ValueTask.CompletedTask;
     }
 }
