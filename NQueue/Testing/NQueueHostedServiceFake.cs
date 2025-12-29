@@ -173,7 +173,7 @@ namespace NQueue.Testing
                     //     break;
 
                     queues = await GetActiveQueues(queueNames, conn, queueHistory);
-                    if (!queues.Any())
+                    if (!queues.Any() && !hadActivity)
                         break;
                     
                     hadActivity = false;
