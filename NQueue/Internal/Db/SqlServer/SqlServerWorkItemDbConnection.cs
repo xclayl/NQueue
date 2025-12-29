@@ -134,7 +134,8 @@ namespace NQueue.Internal.Db.SqlServer
                         reader.GetString(2), 
                         reader.IsDBNull(3) ? null : reader.GetString(3),
                         reader.IsDBNull(4) ? null : reader.GetString(4),
-                        reader.GetInt32(5)) );
+                        reader.GetInt32(5),
+                        1) );
 
                 return await rows.ToListAsync();
             });
@@ -151,7 +152,7 @@ namespace NQueue.Internal.Db.SqlServer
                 var rows = ExecuteReader(
                     "SELECT q.Name, q.LockedUntil, q.ExternalLockId, q.Shard FROM NQueue.Queue q",
                     cnn,
-                    reader => new QueueInfo(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetDateTime(1), reader.IsDBNull(2) ? null : reader.GetString(2), 0, reader.GetInt32(3)));
+                    reader => new QueueInfo(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetDateTime(1), reader.IsDBNull(2) ? null : reader.GetString(2), 0, reader.GetInt32(3), 1));
 
                 return await rows.ToListAsync();
             });
@@ -171,7 +172,8 @@ namespace NQueue.Internal.Db.SqlServer
                         reader.GetString(2), 
                         reader.IsDBNull(3) ? null : reader.GetString(3),
                         reader.IsDBNull(4) ? null : reader.GetString(4),
-                        reader.GetInt32(5)) );
+                        reader.GetInt32(5),
+                        1) );
 
                 return await rows.ToListAsync();
             });

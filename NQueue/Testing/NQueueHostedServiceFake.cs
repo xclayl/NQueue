@@ -137,7 +137,7 @@ namespace NQueue.Testing
 
             var queueHistory = new List<string>();
             
-            await conn.MakeConsistentForTests();
+
             var queues = await GetActiveQueues(queueNames, conn, queueHistory);
             
             var hadActivity = false;
@@ -169,11 +169,13 @@ namespace NQueue.Testing
 
                 if (!queues.Any())
                 {
-                    if (!hadActivity)
-                        break;
+                    // if (!hadActivity)
+                    //     break;
 
-                    await conn.MakeConsistentForTests();
                     queues = await GetActiveQueues(queueNames, conn, queueHistory);
+                    if (!queues.Any())
+                        break;
+                    
                     hadActivity = false;
                 }
             }
@@ -183,21 +185,26 @@ namespace NQueue.Testing
 
         private static async ValueTask<List<(string queueName, int shard)>> GetActiveQueues(Regex? queueNamesMatch, IWorkItemDbConnection conn, IReadOnlyList<string> queueHistory)
         {
+            await conn.MakeConsistentForTests();
+            
             var now = DateTimeOffset.Now;
 
             var queues = await conn.GetQueuesForTesting();
             
             var lockedQueues = queues
-                .Where(q => q.LockedUntil != null && q.LockedUntil > now || q.ExternalLockId != null)
+                .Where(q => q.MaxShards == conn.ShardConfig.ConsumingShardCount)
+                .Where(q => q.LockedUntil != null && q.LockedUntil > now || q.ExternalLockId != null || q.BlockedByCount > 0)
                 .Select(q => q.QueueName)
-                .ToList();
+                .Distinct()
+                .ToHashSet();
             
-            var queueNames = (await conn.GetWorkItemsForTests().ToListAsync())
+            var queueNames = await conn.GetWorkItemsForTests()
+                .Where(wi => wi.MaxShards == conn.ShardConfig.ConsumingShardCount)
+                .Where(qn => !lockedQueues.Contains(qn.QueueName))
                 .Select(wi => (wi.QueueName, wi.Shard))
                 .Distinct()
                 .Where(qn => queueNamesMatch?.IsMatch(qn.QueueName) ?? true)
-                .Where(qn => !lockedQueues.Contains(qn.QueueName))
-                .ToList();
+                .ToListAsync();
 
            var queueOrder = queueHistory // larger indexes means recently ran
                                 .Select((queueName, i) => new {queueName, Order = i})

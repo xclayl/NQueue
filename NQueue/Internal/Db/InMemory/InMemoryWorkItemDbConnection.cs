@@ -58,7 +58,7 @@ namespace NQueue.Internal.Db.InMemory
             var workItems = await _procs.Db.GetWorkItems();
             foreach (var wi in workItems)
                 yield return new WorkItemForTests(wi.WorkItemId, wi.Url, wi.QueueName, wi.DebugInfo, wi.Internal,
-                    0);
+                    0, 1);
         }
 
         public async ValueTask<IReadOnlyList<QueueInfo>> GetQueuesForTesting()
@@ -71,9 +71,13 @@ namespace NQueue.Internal.Db.InMemory
             var workItems = await _procs.Db.GetCompletedWorkItems();
             foreach (var wi in workItems)
                 yield return new WorkItemForTests(wi.WorkItemId, wi.Url, wi.QueueName, wi.DebugInfo, wi.Internal,
-                    0);
+                    0, 1);
         }
-        
-        public ValueTask MakeConsistentForTests() => ValueTask.CompletedTask;
+
+        public ValueTask MakeConsistentForTests()
+        {
+            _procs.Db.MakeConsistent();
+            return ValueTask.CompletedTask;
+        }
     }
 }

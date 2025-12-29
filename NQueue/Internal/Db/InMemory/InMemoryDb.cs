@@ -74,7 +74,7 @@ internal class InMemoryDb
     {
         using var _ = await ALock.Wait(_lock);
         return _queues
-            .Select(q => new QueueInfo(q.QueueName, q.LockedUntil, q.ExternalLockId, q.BlockedBy.Count, 0))
+            .Select(q => new QueueInfo(q.QueueName, q.LockedUntil, q.ExternalLockId, q.BlockedBy.Count, 0, 1))
             .ToList();
     }
 
@@ -151,7 +151,7 @@ internal class InMemoryDb
         return new CronWorkItemTran(_lock, this, _cronJobState, () => _nextId++);
     }
 
-    private void MakeConsistent()
+    public void MakeConsistent()
     {
         foreach (var wi in _workItems.OrderBy(wi => wi.WorkItemId).Where(w => !w.IsIngested).ToList())
         {

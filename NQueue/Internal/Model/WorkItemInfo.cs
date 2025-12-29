@@ -7,7 +7,7 @@ namespace NQueue.Internal.Model
 
     internal record WorkItemInfoWithQueueName(long WorkItemId, string Url, string QueueName, string? Internal, int Shard);
 
-    internal record QueueInfo(string QueueName, DateTimeOffset? LockedUntil, string? ExternalLockId, int BlockedByCount, int Shard);
+    internal record QueueInfo(string QueueName, DateTimeOffset? LockedUntil, string? ExternalLockId, int BlockedByCount, int Shard, int MaxShards);
 
 
     public readonly record struct WorkItem(
@@ -36,5 +36,6 @@ namespace NQueue.Internal.Model
         string QueueName,
         string? DebugInfo,
         string? Internal,
-        int Shard);
+        int Shard,
+        int MaxShards);
 }

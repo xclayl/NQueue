@@ -144,14 +144,16 @@ namespace NQueue.Internal.Db.Postgres
             var list = await _config.WithDbConnection(async cnn =>
             {
                 var rows = ExecuteReader(
-                    "SELECT wi.WorkItemId, wi.Url, wi.QueueName, wi.DebugInfo, wi.Internal, wi.Shard FROM NQueue.WorkItem wi WHERE wi.QueueName NOT IN (SELECT q.Name FROM NQueue.Queue q WHERE q.IsPaused)",
+                    "SELECT wi.WorkItemId, wi.Url, wi.QueueName, wi.DebugInfo, wi.Internal, wi.Shard, wi.MaxShards FROM NQueue.WorkItem wi WHERE wi.QueueName NOT IN (SELECT q.Name FROM NQueue.Queue q WHERE q.IsPaused)",
                     cnn,
                     reader => new WorkItemForTests(reader.GetInt64(0), 
                         new Uri(reader.GetString(1)), 
                         reader.GetString(2), 
                         reader.IsDBNull(3) ? null : reader.GetString(3),
                         reader.IsDBNull(4) ? null : reader.GetString(4),
-                        reader.GetInt32(5)) );
+                        reader.GetInt32(5),
+                        reader.GetInt32(6)
+                        ));
 
                 return await rows.ToListAsync();
             });
@@ -167,9 +169,9 @@ namespace NQueue.Internal.Db.Postgres
             return await _config.WithDbConnection(async cnn =>
             {
                 var rows = ExecuteReader(
-                    "SELECT q.Name, q.LockedUntil, q.ExternalLockId, cardinality(q.BlockedBy), q.Shard FROM NQueue.Queue q",
+                    $"SELECT q.Name, q.LockedUntil, q.ExternalLockId, cardinality(q.BlockedBy), q.Shard, q.MaxShards FROM NQueue.Queue q",
                     cnn,
-                    reader => new QueueInfo(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetDateTime(1), reader.IsDBNull(2) ? null : reader.GetString(2), reader.GetInt32(3), reader.GetInt32(4)));
+                    reader => new QueueInfo(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetDateTime(1), reader.IsDBNull(2) ? null : reader.GetString(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetInt32(5)));
 
                 return await rows.ToListAsync();
             });
@@ -181,14 +183,15 @@ namespace NQueue.Internal.Db.Postgres
             var list = await _config.WithDbConnection(async cnn =>
             {
                 var rows = ExecuteReader(
-                    "SELECT wi.WorkItemId, wi.Url, wi.QueueName, wi.DebugInfo, wi.Internal, wi.Shard FROM NQueue.WorkItemCompleted wi",
+                    $"SELECT wi.WorkItemId, wi.Url, wi.QueueName, wi.DebugInfo, wi.Internal, wi.Shard, wi.MaxShards FROM NQueue.WorkItemCompleted wi",
                     cnn,
                     reader => new WorkItemForTests(reader.GetInt64(0), 
                         new Uri(reader.GetString(1)), 
                         reader.GetString(2), 
                         reader.IsDBNull(3) ? null : reader.GetString(3),
                         reader.IsDBNull(4) ? null : reader.GetString(4),
-                        reader.GetInt32(5)) );
+                        reader.GetInt32(5),
+                        reader.GetInt32(6)) );
 
                 return await rows.ToListAsync();
             });
