@@ -5,6 +5,7 @@ using System.Data.Common;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -835,7 +836,7 @@ public class DbTests : IAsyncLifetime
         var workItems = await fakeApp.FakeService.GetWorkItems().ToListAsync();
 
         workItems.Should().BeEmpty();
-        completedWorkItems.Should().HaveCount(3);
+        completedWorkItems.Should().HaveCount(2);
     }
     
     
@@ -1026,7 +1027,7 @@ public class DbTests : IAsyncLifetime
         var workItems = await fakeApp.FakeService.GetWorkItems().ToListAsync();
 
         workItems.Should().BeEmpty();
-        completedWorkItems.Should().HaveCount(3);
+        completedWorkItems.Should().HaveCount(2);
     
     }
     
@@ -1076,8 +1077,153 @@ public class DbTests : IAsyncLifetime
 
         
     }
+
+    /// <summary>
+    /// External Lock blocks both a parent work-item & the next work-item in the queue
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task AcquireExternalLockBlocksBothParentAndNextWorkItems(DbType dbType)
+    {
+        var dbCnn = await _dbCreators[dbType].CreateWorkItemDbConnection();
+    
+        var procs = await dbCnn.Get();
+        await procs.DeleteAllNQueueDataForUnitTests();
+    
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        var fakeApp = new FakeWebApp();
+        var fakeService = CreateFakeService(dbType, baseUrl);
+        await fakeService.DeleteAllNQueueData();
+        fakeApp.FakeService = fakeService;
+    
+        await using var app = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl)); 
+        var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+        // var nQueueService = app.Services.GetRequiredService<INQueueService>();
+        
+        var resourceName = $"account123-{_uniqueId}";
+        var localHost = await nQueueClient.Localhost("");
+        
+        using var http = app.CreateClient();
+        using var resp = await http.GetAsync(new Uri(localHost, "api/NQueue/ClearLogOrder"));
+        resp.EnsureSuccessStatusCode();
+        
+        // act
+        await nQueueClient.Enqueue(new Uri(localHost, "api/NQueue/LogOrder/parent"), "parent-queue");
+        var myLockId = "";
+        await nQueueClient.BeginAcquireExternalLock(resourceName, lockId =>
+        {
+            myLockId = lockId;
+            return new Uri(localHost, $"/api/NQueue/LogOrder/acquire");
+        }, newWorkItemQueueName: "child-queue", blockQueueName: "parent-queue");
+        await nQueueClient.Enqueue(new Uri(localHost, "api/NQueue/LogOrder/child"), "child-queue");
+        await fakeApp.FakeService.ProcessAll(app.CreateClient, app.Services.GetRequiredService<ILoggerFactory>());
+    
+        
+        
+        // assert
+        
+       
+        var completedWorkItems = await fakeApp.FakeService.GetCompletedWorkItems().ToListAsync();
+        var workItems = await fakeApp.FakeService.GetWorkItems().ToListAsync();
+
+        workItems.Where(wi => wi.Url.AbsoluteUri != "noop:").Should().HaveCount(2);
+        completedWorkItems.Should().HaveCount(1);
+        
+        // act
+        await nQueueClient.ReleaseExternalLock(myLockId);
+        await fakeApp.FakeService.ProcessAll(app.CreateClient, app.Services.GetRequiredService<ILoggerFactory>());
+        
+        
+        // assert
+        
+        completedWorkItems = await fakeApp.FakeService.GetCompletedWorkItems().ToListAsync();
+        workItems = await fakeApp.FakeService.GetWorkItems().ToListAsync();
+
+        workItems.Should().BeEmpty();
+        completedWorkItems.Should().HaveCount(3);
+        
+        
+        var order = await http.GetFromJsonAsync<List<string>>(new Uri(localHost, "api/NQueue/ReadOrder"));
+        order.Should().HaveCount(3);
+        order.Should().BeEquivalentTo(new List<string>() {"parent", "acquire", "child"});
+        order.First().Should().Be("acquire");
+    }
     
     
+    /// <summary>
+    /// External Lock blocks the next work-item in the queue
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(MyTheoryData))]
+    public async Task AcquireExternalLockBlocksNextWorkItem(DbType dbType)
+    {
+        var dbCnn = await _dbCreators[dbType].CreateWorkItemDbConnection();
+    
+        var procs = await dbCnn.Get();
+        await procs.DeleteAllNQueueDataForUnitTests();
+    
+        // arrange 
+        var baseUrl = new Uri("http://localhost:8501");
+        var fakeApp = new FakeWebApp();
+        var fakeService = CreateFakeService(dbType, baseUrl);
+        await fakeService.DeleteAllNQueueData();
+        fakeApp.FakeService = fakeService;
+    
+        await using var app = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureFakes(fakeApp, baseUrl)); 
+        var nQueueClient = app.Services.GetRequiredService<INQueueClient>();
+        // var nQueueService = app.Services.GetRequiredService<INQueueService>();
+        
+        var resourceName = $"account123-{_uniqueId}";
+        var localHost = await nQueueClient.Localhost("");
+        
+        using var http = app.CreateClient();
+        using var resp = await http.GetAsync(new Uri(localHost, "api/NQueue/ClearLogOrder"));
+        resp.EnsureSuccessStatusCode();
+        
+        // act
+        var myLockId = "";
+        await nQueueClient.BeginAcquireExternalLock(resourceName, lockId =>
+        {
+            myLockId = lockId;
+            return new Uri(localHost, $"/api/NQueue/LogOrder/acquire");
+        }, newWorkItemQueueName: "my-queue");
+        await nQueueClient.Enqueue(new Uri(localHost, "api/NQueue/LogOrder/next"), "my-queue");
+        await fakeApp.FakeService.ProcessAll(app.CreateClient, app.Services.GetRequiredService<ILoggerFactory>());
+    
+        
+        
+        // assert
+        
+       
+        var completedWorkItems = await fakeApp.FakeService.GetCompletedWorkItems().ToListAsync();
+        var workItems = await fakeApp.FakeService.GetWorkItems().ToListAsync();
+
+        workItems.Where(wi => wi.Url.AbsoluteUri != "noop:").Should().HaveCount(1);
+        completedWorkItems.Should().HaveCount(1);
+        
+        // act
+        await nQueueClient.ReleaseExternalLock(myLockId);
+        await fakeApp.FakeService.ProcessAll(app.CreateClient, app.Services.GetRequiredService<ILoggerFactory>());
+        
+        
+        // assert
+        
+        completedWorkItems = await fakeApp.FakeService.GetCompletedWorkItems().ToListAsync();
+        workItems = await fakeApp.FakeService.GetWorkItems().ToListAsync();
+
+        workItems.Should().BeEmpty();
+        completedWorkItems.Should().HaveCount(2);
+        
+        
+        var order = await http.GetFromJsonAsync<List<string>>(new Uri(localHost, "api/NQueue/ReadOrder"));
+        order.Should().HaveCount(2);
+        order.Should().BeEquivalentTo(new List<string>() {"acquire", "next"});
+        order.First().Should().Be("acquire");
+    }
+
     /// <summary>
     /// Lock a queue, and see the state  
     /// </summary>

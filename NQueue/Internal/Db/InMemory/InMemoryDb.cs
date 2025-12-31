@@ -264,24 +264,53 @@ internal class InMemoryDb
 
         var queue = _queues.SingleOrDefault(q => q.QueueName == wi.QueueName);
 
-        if (queue?.BlockedBy.Any() ?? false)
+        if (queue == null)
+            throw new Exception($"Work Item {workItemId} could not be found");
+        
+        if (queue.BlockedBy.Any())
             throw new Exception("Cannot complete a blocked work item (it should be blocked)");
 
-        if (queue != null)
+
+        if (wi.ExternalLockIdWhenComplete != null)
+        {
+            // the next work item must be noop: to block the parent (wi.BlockQueueName) or next work-item in the queue
+            
+            if (queue.ExternalLockId != null)
+                throw new Exception("Cannot replace an existing ExternalLockId (this shouldn''t be possible).");
+
+            var noopWi = new WorkItemForInMemory()
+            {
+                WorkItemId = _nextId++,
+                Url = new Uri("noop:"),
+                QueueName = queue.QueueName,
+                DebugInfo = null,
+                IsIngested = true,
+                Internal = null,
+                BlockQueueName = wi.BlockQueueName,
+                ExternalLockIdWhenComplete = null,
+            };
+            _workItems.Add(noopWi);
+            
+            if (wi.BlockQueueName != null)
+                _blockingMessages.Add(new BlockingMessage
+                {
+                    BlockingMessageId = _nextId++,
+                    QueueName = wi.BlockQueueName,
+                    IsCreatingBlock = true,
+                    BlockingWorkItemId = noopWi.WorkItemId,
+                });
+            
+            _queues.Remove(queue);
+            _queues.Add(queue with
+            {
+                ExternalLockId = wi.ExternalLockIdWhenComplete,
+                LockedUntil = DateTimeOffset.Now,
+                NextWorkItemId = noopWi.WorkItemId,
+            });
+        }
+        else 
         {
 
-            if (wi.ExternalLockIdWhenComplete != null)
-            {
-                if (queue.ExternalLockId != null)
-                    throw new Exception("Cannot replace an existing ExternalLockId (this shouldn''t be possible).");
-                
-                _queues.Remove(queue);
-                queue = queue with
-                {
-                    ExternalLockId = wi.ExternalLockIdWhenComplete,
-                };
-                _queues.Add(queue);
-            }
             
             var nextWorkItemId = _workItems
                 .OrderBy(w => w.WorkItemId)
@@ -343,7 +372,8 @@ internal class InMemoryDb
         }
         
         _workItems.Remove(wi);
-        _completedWorkItems.Add(wi);
+        if (wi.Url.AbsoluteUri != "noop:")
+            _completedWorkItems.Add(wi);
         
         
         if (wi.BlockQueueName != null)

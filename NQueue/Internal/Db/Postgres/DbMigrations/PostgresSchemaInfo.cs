@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace NQueue.Internal.Db.Postgres.DbMigrations;
 
+
 internal record class PostgresSchemaInfo(string Type, string Name, string? DataType = null)
 {
     private const string Boolean = "boolean";
@@ -1122,10 +1123,41 @@ internal record class PostgresSchemaInfo(string Type, string Name, string? DataT
 
         
     };
-    public static bool IsVersion16(IReadOnlyList<PostgresSchemaInfo> actual)
+    public static bool IsVersion16(IReadOnlyList<PostgresSchemaInfo> actual, IReadOnlyList<KeyValuePair<string, string>> routines)
     {
         var expected = Version16;
        
-        return IsVersion(actual, expected);
+        return IsVersion(actual, expected) && IsVersion16Or17Routine(routines) == SubVersion.V16;
+    }
+
+    private enum SubVersion
+    {
+        Unknown,
+        V16,
+        V17
+    }
+
+    private static SubVersion IsVersion16Or17Routine(IReadOnlyList<KeyValuePair<string, string>> routines)
+    {
+        var matches = routines
+            .Where(r => r.Key.Equals("CompleteWorkItem", StringComparison.InvariantCultureIgnoreCase))
+            .ToList();
+        
+        if (matches.Count != 1)
+            return SubVersion.Unknown;
+
+        var completeWorkItem = matches.Single();
+        if (completeWorkItem.Value.Contains("-- Fixed in v17"))
+            return SubVersion.V17;
+
+        return SubVersion.V16;
+    }
+    
+    
+    public static bool IsVersion17(IReadOnlyList<PostgresSchemaInfo> actual, IReadOnlyList<KeyValuePair<string, string>> routines)
+    {
+        var expected = Version16;
+       
+        return IsVersion(actual, expected) && IsVersion16Or17Routine(routines) == SubVersion.V17;
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -20,6 +21,7 @@ namespace NQueue.Sample.Controllers
         private readonly INQueueService _service;
         private readonly IServer _server;
         private static volatile string? _msg;
+        private static readonly ConcurrentQueue<string> _workItemOrder = new();
 
         private readonly record struct MyStruct(string QueueName, string ResourceName);
         
@@ -63,6 +65,32 @@ namespace NQueue.Sample.Controllers
             return new StatusCodeResult(261); // totally made up code
         }
 
+        
+        [HttpGet]
+        public void ClearLogOrder()
+        {
+            _workItemOrder.Clear();
+        }
+        
+        [HttpGet("{msg}")]
+        public void LogOrder([FromRoute] string msg)
+        {
+            _workItemOrder.Enqueue(msg);
+        }
+        
+        [HttpGet("{msg}")]
+        public async Task LogOrderReleaseLock([FromRoute] string msg, [FromQuery] string lockId)
+        {
+            await _client.ReleaseExternalLock(lockId);
+            _workItemOrder.Enqueue(msg);
+        }
+        
+        [HttpGet]
+        public List<string> ReadOrder()
+        {
+            return _workItemOrder.ToList();
+        }
+        
         public async Task<IActionResult> ErrorOp()
         {
             await Task.Delay(TimeSpan.FromMinutes(2));

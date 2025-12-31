@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
@@ -23,32 +24,44 @@ end; $$");
             var attempts = 0;
             var highestVersionDetected = 0;
 
-            while (currentVersion != 16)
+            while (currentVersion != 17)
             {
                 attempts++;
                 if (attempts > 100)
                     throw new Exception($"Unable to migrate the nqueue database schema.  Last version detected: {highestVersionDetected} (so there is probably an issue migrating to version {highestVersionDetected + 1})");
 
-                var dbObjects = await AbstractWorkItemDb.ExecuteReader(
+                var objectsInDb = await AbstractWorkItemDb.ExecuteReader(
                     tran,
                     @"                   
-                    select 'schema' AS type, s.SCHEMA_NAME::text AS name, NULL::text AS data_type from INFORMATION_SCHEMA.SCHEMATA s where s.SCHEMA_NAME = 'nqueue'
+                    select 'schema' AS type, s.SCHEMA_NAME::text AS name, NULL::text AS data_type, NULL::text AS source_code from INFORMATION_SCHEMA.SCHEMATA s where s.SCHEMA_NAME = 'nqueue'
                     UNION
-                    select 'table' AS type, t.TABLE_NAME, NULL::text AS data_type FROM INFORMATION_SCHEMA.TABLES t WHERE t.TABLE_SCHEMA = 'nqueue'
+                    select 'table' AS type, t.TABLE_NAME, NULL::text AS data_type, NULL::text AS source_code FROM INFORMATION_SCHEMA.TABLES t WHERE t.TABLE_SCHEMA = 'nqueue'
                     UNION
-                    select 'routine' AS type, r.ROUTINE_NAME, NULL::text AS data_type FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'nqueue'
+                    select 'routine-source-code' AS type, p.proname, NULL::text AS data_type, pg_get_functiondef(p.oid) as source_code FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'nqueue'
                     UNION
-                    select 'column' AS type, c.table_name::text || '.' || c.column_name::text AS column_name, c.data_type::text FROM INFORMATION_SCHEMA.COLUMNS c WHERE c.TABLE_SCHEMA = 'nqueue'
+                    select 'routine' AS type, r.ROUTINE_NAME, NULL::text AS data_type, NULL::text AS source_code FROM INFORMATION_SCHEMA.ROUTINES r WHERE r.ROUTINE_SCHEMA = 'nqueue'
                     UNION
-                    select 'index' AS type, i.tablename::text || '.' || i.indexname::text || ': ' || i.indexdef, NULL::text AS data_type FROM pg_indexes i WHERE i.schemaname = 'nqueue';
+                    select 'column' AS type, c.table_name::text || '.' || c.column_name::text AS column_name, c.data_type::text, NULL::text AS source_code FROM INFORMATION_SCHEMA.COLUMNS c WHERE c.TABLE_SCHEMA = 'nqueue'
+                    UNION
+                    select 'index' AS type, i.tablename::text || '.' || i.indexname::text || ': ' || i.indexdef, NULL::text AS data_type, NULL::text AS source_code FROM pg_indexes i WHERE i.schemaname = 'nqueue';
                     ", 
-                        reader => new PostgresSchemaInfo(
-                        reader.GetString(0),
-                        reader.GetString(1),
-                        reader.IsDBNull(2) ? null : reader.GetString(2)
-                    )
+                        reader => new {
+                        Type = reader.GetString(0),
+                        Name = reader.GetString(1),
+                        DataType = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        SourceCode = reader.IsDBNull(3) ? null : reader.GetString(3)
+                        }
                 ).ToListAsync();
 
+                var dbObjects = objectsInDb
+                    .Where(o => o.Type != "routine-source-code")
+                    .Select(o => new PostgresSchemaInfo(o.Type, o.Name, o.DataType))
+                    .ToList();
+
+                var routines = objectsInDb
+                    .Where(o => o.Type == "routine-source-code")
+                    .Select(o => new KeyValuePair<string, string>(o.Name, o.SourceCode ?? ""))
+                    .ToList();
 
                 if (dbObjects.Count == 0 || dbObjects.Count == 1 && dbObjects.Single().Type == "schema" && dbObjects.Single().Name == "nqueue")
                 {
@@ -56,7 +69,11 @@ end; $$");
 
                     currentVersion = 0;
                 }
-                else if (PostgresSchemaInfo.IsVersion16(dbObjects))
+                else if (PostgresSchemaInfo.IsVersion17(dbObjects, routines))
+                {
+                    currentVersion = 17;
+                }
+                else if (PostgresSchemaInfo.IsVersion16(dbObjects, routines))
                 {
                     currentVersion = 16;
                 }
@@ -197,6 +214,10 @@ end; $$");
                 if (currentVersion == 15)
                 {
                     await new PostgresDbUpgrader16().Upgrade(tran, isCitus);
+                }
+                if (currentVersion == 16)
+                {
+                    await new PostgresDbUpgrader17().Upgrade(tran, isCitus);
                 }
             }
 
