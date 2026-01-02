@@ -1127,27 +1127,46 @@ internal record class PostgresSchemaInfo(string Type, string Name, string? DataT
     {
         var expected = Version16;
        
-        return IsVersion(actual, expected) && IsVersion16Or17Routine(routines) == SubVersion.V16;
+        return IsVersion(actual, expected) && IsVersion16Or17Or18Routine(routines) == SubVersion.V16;
     }
 
     private enum SubVersion
     {
         Unknown,
         V16,
-        V17
+        V17,
+        V18
     }
 
-    private static SubVersion IsVersion16Or17Routine(IReadOnlyList<KeyValuePair<string, string>> routines)
+    private static string? GetRoutineSourceCode(string name, IReadOnlyList<KeyValuePair<string, string>> routines)
     {
         var matches = routines
-            .Where(r => r.Key.Equals("CompleteWorkItem", StringComparison.InvariantCultureIgnoreCase))
+            .Where(r => r.Key.Equals(name, StringComparison.InvariantCultureIgnoreCase))
             .ToList();
         
         if (matches.Count != 1)
-            return SubVersion.Unknown;
+            return null;
 
-        var completeWorkItem = matches.Single();
-        if (completeWorkItem.Value.Contains("-- Fixed in v17"))
+        return matches.Single().Value;
+    }
+
+    private static SubVersion IsVersion16Or17Or18Routine(IReadOnlyList<KeyValuePair<string, string>> routines)
+    {
+        var nextWorkItem = GetRoutineSourceCode("NextWorkItem", routines);
+        if (nextWorkItem == null)
+            return SubVersion.Unknown;
+        if (nextWorkItem.Contains("-- Fixed in v18"))
+            return SubVersion.V18;
+        
+        
+        
+
+        var completeWorkItem = GetRoutineSourceCode("CompleteWorkItem", routines);
+        if (completeWorkItem == null)
+            return SubVersion.Unknown;
+        
+  
+        if (completeWorkItem.Contains("-- Fixed in v17"))
             return SubVersion.V17;
 
         return SubVersion.V16;
@@ -1158,6 +1177,13 @@ internal record class PostgresSchemaInfo(string Type, string Name, string? DataT
     {
         var expected = Version16;
        
-        return IsVersion(actual, expected) && IsVersion16Or17Routine(routines) == SubVersion.V17;
+        return IsVersion(actual, expected) && IsVersion16Or17Or18Routine(routines) == SubVersion.V17;
+    } 
+    
+    public static bool IsVersion18(IReadOnlyList<PostgresSchemaInfo> actual, IReadOnlyList<KeyValuePair<string, string>> routines)
+    {
+        var expected = Version16;
+       
+        return IsVersion(actual, expected) && IsVersion16Or17Or18Routine(routines) == SubVersion.V18;
     }
 }
